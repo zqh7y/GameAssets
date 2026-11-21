@@ -1,0 +1,9 @@
+{
+  "wizard":  { "name": "Mage",    "scale": 1.00 },
+  "ghost":   { "name": "Ghost",   "scale": 0.95 },
+  "dragon":  { "name": "Dragon",  "scale": 0.90 },
+  "tnt":     { "name": "TNT",     "scale": 0.75 },
+  "octopus": { "name": "Octopus", "scale": 0.70 },
+  "acorn":   { "name": "Acorn",   "scale": 0.55 },
+  "chick":   { "name": "Peep",    "scale": 0.50 }
+}
