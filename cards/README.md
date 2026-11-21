@@ -1,25 +1,23 @@
 # Cards
 
-Backgrounds for the "choose a card" screen. Transparent PNGs, 318 × 459 px (4px padding included).
+Backgrounds for the "choose a card" screen. Transparent PNGs, both 317 × 461 px (4px padding included).
 
 | Preview | Name | File |
 |:---:|---|---|
-| <img src="basic.png" height="140"> | Basic | `basic.png` |
-| <img src="jackpot.png" height="140"> | Jackpot | `jackpot.png` |
+| <img src="basic.png" height="140"> | Basic (regular) | `basic.png` |
+| <img src="jackpot.png" height="140"> | Jackpot (rare) | `jackpot.png` |
 
-Both cards share exactly the same frame. The jackpot card is the basic card with a warm
-glow and light rays drawn inside its window.
+Both cards share the same frame. The jackpot card has heavenly light falling into its window.
 
 ## Layout
 
-- **Window** (top): about 251 × 265 px, for the brawler
+- **Window** (top): about 250 × 265 px, for the brawler
 - **Label panel** (bottom): for a short text such as `+2 TNT`
 
 ## Source
 
-The original image is in [`source/`](source/): `cards_greenscreen.jpg`, two cards on a green
-screen. Only the left card is used. The right one had light leaking past its edge, so the
-jackpot card is generated from the basic one.
+The original image is in [`source/`](source/): `cards_greenscreen.jpg`, both cards on a green
+screen (left = jackpot, right = basic).
 
 To regenerate both cards (needs `numpy` and `Pillow`), run this from the repo root:
 
