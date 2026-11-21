@@ -22,6 +22,10 @@ What each card shows:
   slightly different sizes and tilts. The mirrored TNT still reads "TNT".
 - **Grounding:** each brawler has a wide soft shadow plus a small dark one under its feet, the
   back row fades slightly for depth, and there is a soft glow behind the group.
+- **A few small effects:** sprites from [`effects/`](../effects/), themed per brawler and kept
+  light. The TNT has a spark on its fuse, the Mage has twinkles at the staff, and the others
+  have two or three small pieces drifting around the group (feathers, leaves, bubbles, flames,
+  wisps).
 - **Label:** gold number and white name, with a dark outline and a drop shadow.
 
 The label font is a placeholder (whatever bold font the script finds), not the game's font.

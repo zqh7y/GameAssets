@@ -2,9 +2,9 @@
 
 These are previews only, not game assets. They show the intended look: shaded brawlers at
 their relative sizes (brawlers/sizes.json), standing in groups in the card window, with
-ground shadows and a "+N Name" label.
+ground shadows, a few small themed effects and a "+N Name" label.
 
-Input:  cards/*.png, brawlers/*.png, brawlers/sizes.json
+Input:  cards/*.png, brawlers/*.png, brawlers/sizes.json, effects/*.png
 Output: examples/*.jpg
 
 Requires: numpy, Pillow
@@ -49,6 +49,32 @@ MIRRORED = {
     5: [False, True, True, True, False],
 }
 
+# Small themed effects. Kept light on purpose: a card gets a few accents, not a show.
+#
+# Attached effects sit on a point of the brawler itself:
+#   (effect, x, y, size, angle, who)
+#   x, y   position in the sprite, 0..1, for a brawler facing its normal way
+#   size   relative to the brawler's height
+#   angle  degrees, counter-clockwise
+#   who    "all" = every brawler in the group, "front" = only the one in front
+ATTACHED = {
+    "tnt": [("spark", 0.41, 0.02, 0.30, 0, "all")],                 # a lit fuse on every TNT
+    "wizard": [("sparkle", 0.94, 0.22, 0.22, 0, "all"),             # twinkles at the staff
+               ("sparkle", 0.74, 0.20, 0.12, 0, "front"),
+               ("sparkle", 1.04, 0.40, 0.10, 0, "front")],
+}
+# Floating effects drift around the whole group: (effect, largest random tilt, places).
+# A place is (x, y, size): x and y relative to the group's bounding box (0..1 across and
+# down, so values below 0 or above 1 are just outside it), size relative to the brawler's height.
+_AROUND_TOP = [(-0.03, 0.08, 0.30), (1.03, 0.30, 0.24), (0.52, -0.10, 0.20)]
+FLOATING = {
+    "ghost": ("wisp", 15, [(-0.06, 0.66, 0.24), (1.06, 0.74, 0.19)]),      # mist trailing low at the sides
+    "dragon": ("flame", 12, [(-0.02, 0.04, 0.22), (1.03, 0.00, 0.17)]),    # two small flames
+    "acorn": ("leaf", 25, _AROUND_TOP),
+    "octopus": ("bubble", 0, _AROUND_TOP),
+    "chick": ("feather", 25, _AROUND_TOP[:2]),
+}
+
 # The label font is a placeholder: the first of these that exists is used.
 FONT_CANDIDATES = [
     "/usr/share/fonts/opentype/inter/Inter-ExtraBold.otf",
@@ -79,6 +105,25 @@ def shaded(brawler: str, flip: bool = False) -> Image.Image:
     return _shaded[key]
 
 
+_effects: dict[str, Image.Image] = {}
+
+
+def effect(name: str, size: float, angle: float = 0.0) -> Image.Image:
+    """An effect sprite scaled to `size` pixels and turned by `angle` degrees."""
+    if name not in _effects:
+        _effects[name] = Image.open(ROOT / "effects" / f"{name}.png").convert("RGBA")
+    px = max(8, round(size))
+    img = _effects[name].resize((px, px), Image.LANCZOS)
+    if angle:
+        img = img.rotate(angle, resample=Image.BICUBIC, expand=True)
+    return img
+
+
+def stamp(card: Image.Image, img: Image.Image, cx: float, cy: float) -> None:
+    """Draw `img` centred on (cx, cy)."""
+    card.alpha_composite(img, (max(0, round(cx - img.width / 2)), max(0, round(cy - img.height / 2))))
+
+
 def fit(src: Image.Image, h: float) -> Image.Image:
     """Scale a sprite to height h (a very wide sprite is limited by its width instead)."""
     k = min(h / src.height, h * 1.25 / src.width)
@@ -103,7 +148,7 @@ def window_box() -> list[int]:
 
 
 def layout(brawler: str, count: int, unit_h: float, rng: random.Random):
-    """Sprites of a group with positions relative to the group's anchor: (sprite, x, ground y)."""
+    """A group's sprites, relative to the group's anchor: (sprite, x, ground y, mirrored)."""
     spots = FORMATIONS[count]
     ys = [s[1] for s in spots]
     units = []
@@ -118,15 +163,15 @@ def layout(brawler: str, count: int, unit_h: float, rng: random.Random):
             haze = Image.new("RGBA", spr.size, (246, 226, 190, 0))
             haze.putalpha(spr.getchannel("A").point(lambda v: int(v * 0.10 * (1 - t))))
             spr = Image.alpha_composite(spr, haze)
-        units.append((spr, dx * unit_h, dy * unit_h))
+        units.append((spr, dx * unit_h, dy * unit_h, flip))
     return units
 
 
 def bounds(units) -> tuple[float, float, float, float]:
-    x0 = min(x - s.width / 2 for s, x, y in units)
-    x1 = max(x + s.width / 2 for s, x, y in units)
-    y0 = min(y - s.height for s, x, y in units)
-    y1 = max(y for s, x, y in units)
+    x0 = min(x - s.width / 2 for s, x, y, _ in units)
+    x1 = max(x + s.width / 2 for s, x, y, _ in units)
+    y0 = min(y - s.height for s, x, y, _ in units)
+    y1 = max(y for s, x, y, _ in units)
     return x0, y0, x1, y1
 
 
@@ -176,7 +221,7 @@ def make_card(card_name: str, brawler: str, count: int, seed: int) -> Image.Imag
     # Centre the group in the window, a little below the middle, feet off the bottom edge.
     ox = (wx0 + wx1) / 2 - (bx0 + bx1) / 2
     oy = min(wy0 + wh * 0.54 - (by0 + by1) / 2, wy1 - wh * 0.07 - by1)
-    placed = [(s, round(ox + x), round(oy + y)) for s, x, y in units]
+    placed = [(s, round(ox + x), round(oy + y), flip) for s, x, y, flip in units]
 
     # Soft glow behind the group.
     glow = Image.new("RGBA", card.size, (0, 0, 0, 0))
@@ -189,15 +234,36 @@ def make_card(card_name: str, brawler: str, count: int, seed: int) -> Image.Imag
     soft = Image.new("RGBA", card.size, (0, 0, 0, 0))
     tight = Image.new("RGBA", card.size, (0, 0, 0, 0))
     ds, dt = ImageDraw.Draw(soft), ImageDraw.Draw(tight)
-    for spr, cx, ground in placed:
+    for spr, cx, ground, _ in placed:
         sw, sh = spr.width * 0.86, spr.width * 0.20
         ds.ellipse((cx - sw / 2, ground - sh * 0.60, cx + sw / 2, ground + sh * 0.40), fill=(96, 52, 12, 105))
         tw, th = spr.width * 0.58, spr.width * 0.10
         dt.ellipse((cx - tw / 2, ground - th * 0.75, cx + tw / 2, ground + th * 0.25), fill=(70, 34, 6, 120))
     card.alpha_composite(soft.filter(ImageFilter.GaussianBlur(max(3, unit_h * 0.035))))
     card.alpha_composite(tight.filter(ImageFilter.GaussianBlur(max(2, unit_h * 0.015))))
-    for spr, cx, ground in sorted(placed, key=lambda u: u[2]):   # back to front
-        card.alpha_composite(spr, (cx - spr.width // 2, ground - spr.height))
+    order = sorted(placed, key=lambda u: u[2])                   # back to front
+    for spr, cx, ground, flip in order:
+        left, top = cx - spr.width // 2, ground - spr.height
+        card.alpha_composite(spr, (left, top))
+        # Effects attached to this brawler, drawn right after it so brawlers in front cover them.
+        for name, ax, ay, size, angle, who in ATTACHED.get(brawler, []):
+            if who == "front" and spr is not order[-1][0]:
+                continue
+            if flip:
+                ax, angle = 1 - ax, -angle
+            stamp(card, effect(name, size * spr.height, angle), left + ax * spr.width, top + ay * spr.height)
+
+    # Effects floating around the group, kept inside the window.
+    if brawler in FLOATING:
+        name, tilt, places = FLOATING[brawler]
+        rng = random.Random(seed + 1000)
+        gx0, gy0, gw, gh = ox + bx0, oy + by0, bx1 - bx0, by1 - by0
+        for fx, fy, size in places:
+            img = effect(name, size * unit_h, rng.uniform(-tilt, tilt))
+            half = max(img.size) / 2 + 6
+            x = min(max(gx0 + fx * gw, wx0 + half), wx1 - half)
+            y = min(max(gy0 + fy * gh, wy0 + half), wy1 - half)
+            stamp(card, img, x, y)
 
     draw_label(card, f"+{count}", SIZES[brawler]["name"], wy1 + 26 * S, card.height - 22 * S)
     return card
