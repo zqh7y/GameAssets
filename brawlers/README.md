@@ -1,6 +1,6 @@
 # Brawlers
 
-Transparent PNG sprites, cropped tight with 4px padding. Each brawler comes in two versions:
+Transparent PNG sprites, cropped tight with 4px padding. Each brawler comes in three versions:
 
 - **Flat** (`<name>.png`): the original sprite.
 - **Shaded** (`shaded/<name>.png`): the same design with soft 3D shading, at 2x the size.
