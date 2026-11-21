@@ -7,7 +7,7 @@ intended look, so the game can be built to match.
 
 ![Peep, Mage and Ghost on cards](cards_peep_mage_ghost.jpg)
 
-![Acorn, TNT and Dragon on cards](cards_acorn_tnt_dragon.jpg)
+![Mr Nut, TNT and Dragon on cards](cards_acorn_tnt_dragon.jpg)
 
 ![Octopus, Dragon and TNT on cards](cards_octopus_dragon_tnt.jpg)
 
@@ -22,10 +22,11 @@ What each card shows:
   slightly different sizes and tilts. The mirrored TNT still reads "TNT".
 - **Grounding:** each brawler has a wide soft shadow plus a small dark one under its feet, the
   back row fades slightly for depth, and there is a soft glow behind the group.
-- **A few small effects:** sprites from [`effects/`](../effects/), themed per brawler and kept
-  light. The TNT has a spark on its fuse, the Mage has twinkles at the staff, and the others
-  have two or three small pieces drifting around the group (feathers, leaves, bubbles, flames,
-  wisps).
+- **Minimal particle effects:** a few plain flat shapes from [`effects/`](../effects/), tinted
+  in one colour per brawler, with no outlines and no detail. The TNT has a glint and two dots
+  on its fuse, the Mage has a soft blue glow behind it and glints at the staff, and the others
+  have three to five small shapes around the group: feather slivers, leaf slivers, ember dots,
+  mist dots and bubble rings. In the game these would move; the previews show one moment.
 - **Label:** gold number and white name, with a dark outline and a drop shadow.
 
 The label font is a placeholder (whatever bold font the script finds), not the game's font.

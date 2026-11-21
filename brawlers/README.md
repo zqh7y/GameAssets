@@ -13,7 +13,7 @@ Transparent PNG sprites, cropped tight with 4px padding. Each brawler comes in t
 | <img src="dragon.png" height="64"> | <img src="shaded/dragon.png" height="64"> | Dragon | `dragon.png` | 233 × 250 | 0.9 |
 | <img src="tnt.png" height="64"> | <img src="shaded/tnt.png" height="64"> | TNT | `tnt.png` | 233 × 263 | 0.75 |
 | <img src="octopus.png" height="64"> | <img src="shaded/octopus.png" height="64"> | Octopus | `octopus.png` | 223 × 210 | 0.7 |
-| <img src="acorn.png" height="64"> | <img src="shaded/acorn.png" height="64"> | Acorn | `acorn.png` | 201 × 235 | 0.55 |
+| <img src="acorn.png" height="64"> | <img src="shaded/acorn.png" height="64"> | Mr Nut | `acorn.png` | 201 × 235 | 0.55 |
 | <img src="chick.png" height="64"> | <img src="shaded/chick.png" height="64"> | Peep | `chick.png` | 219 × 266 | 0.5 |
 
 ## Sizes
