@@ -17,8 +17,9 @@ What each card shows:
 - **True sizes:** every brawler is drawn at its own size from [`brawlers/sizes.json`](../brawlers/sizes.json),
   so a Peep is half as tall as a Mage. A group is only shrunk if it would not fit in the window.
 - **Shaded brawlers:** the 3D-shaded sprites from [`brawlers/shaded/`](../brawlers/shaded/).
-- **Small variations:** some brawlers in a group face the other way, with slightly different
-  sizes and tilts. The TNT is never mirrored because of its letters.
+- **Mixed directions:** the brawlers in a group look in different directions, using the
+  mirrored sprites from [`brawlers/shaded_mirrored/`](../brawlers/shaded_mirrored/), with
+  slightly different sizes and tilts. The mirrored TNT still reads "TNT".
 - **Grounding:** each brawler has a wide soft shadow plus a small dark one under its feet, the
   back row fades slightly for depth, and there is a soft glow behind the group.
 - **Label:** gold number and white name, with a dark outline and a drop shadow.

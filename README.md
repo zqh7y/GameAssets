@@ -10,12 +10,13 @@ it moves into the main project repo.
 - [`brawlers/`](brawlers/): brawler sprites (transparent PNGs)
   - `<name>.png`: flat sprites
   - `shaded/<name>.png`: the same sprites with 3D shading
+  - `shaded_mirrored/<name>.png`: the shaded sprites facing the other way
   - `sizes.json`: each brawler's display name and relative size
   - `source/`: the original images
 - [`cards/`](cards/): backgrounds for the "choose a card" screen (basic and jackpot), with the original in `cards/source/`
 - [`examples/`](examples/): previews of how the brawlers look on the cards (not game assets)
 - [`scripts/`](scripts/): helper scripts
   - `extract_brawlers.py` cuts the brawler sprites out of their source images
-  - `shade_brawlers.py` adds the 3D shading to the flat sprites
+  - `shade_brawlers.py` adds the 3D shading to the flat sprites and makes the mirrored versions
   - `extract_cards.py` cuts the basic and jackpot cards out of their source image
   - `make_card_examples.py` renders the previews in `examples/`

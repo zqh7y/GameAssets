@@ -1,7 +1,11 @@
 """Give the flat brawler sprites soft, rounded 3D shading.
 
-Input:  brawlers/<name>.png          (flat sprites)
-Output: brawlers/shaded/<name>.png   (same design, shaded, at 2x the size)
+Input:  brawlers/<name>.png                   (flat sprites)
+Output: brawlers/shaded/<name>.png            (same design, shaded, at 2x the size)
+        brawlers/shaded_mirrored/<name>.png   (the same, facing the other way)
+
+The mirrored sprites are mirrored first and shaded afterwards, so the light comes from the
+top left in both folders. Never mirror a shaded sprite directly: its light would flip too.
 
 How it works: every colour region of a sprite (body, wing, hat...) is "inflated" from its
 dark outline inward into a smooth height map. That height map is lit from the top left,
@@ -15,11 +19,16 @@ Run from the repo root:  python3 scripts/shade_brawlers.py
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
+
+from extract_brawlers import dilate, label
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "brawlers"
 OUT = ROOT / "brawlers" / "shaded"
+OUT_MIRRORED = ROOT / "brawlers" / "shaded_mirrored"
+
+LETTERED = {"tnt"}                            # sprites with the letters "TNT" on them
 
 UPSCALE = 2                                   # shading is computed (and saved) at 2x for smoothness
 LIGHT = np.array([-0.55, -0.70, 0.46])        # light direction: from the top left, toward the viewer
@@ -94,11 +103,65 @@ def shade_sprite(sprite: Image.Image, strength: float = 1.0, up: int = UPSCALE) 
     return Image.fromarray(res, "RGBA")
 
 
+def mirror_keep_letters(sprite: Image.Image) -> Image.Image:
+    """Mirror a sprite that has the yellow letters "TNT" on it, keeping the text readable.
+
+    "TNT" reads the same in both directions, so after mirroring only the N is wrong (it
+    shows as a backwards N). This flips the N back and slants it to follow the mirrored box.
+    """
+    m = sprite.convert("RGBA").transpose(Image.FLIP_LEFT_RIGHT)
+    a = np.asarray(m).astype(np.int32)
+    r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
+    yellow = (r > 190) & (g > 140) & (b < 120) & (al > 200) & (r - b > 110)
+    labels, n = label(yellow)
+    letters = []
+    for i in range(1, n + 1):
+        ys, xs = np.nonzero(labels == i)
+        if len(xs) > 60:  # ignore specks
+            letters.append((xs.mean(), i, xs.min(), xs.max(), ys.min(), ys.max()))
+    letters.sort()
+    if len(letters) != 3:
+        raise SystemExit(f"expected 3 letters on the sprite, found {len(letters)}")
+    (_, _, ax0, _, ay0, ay1), (_, n_id, nx0, nx1, ny0, ny1), (_, _, cx0, _, cy0, cy1) = letters
+    # Slope of the line of text, from the first to the last letter.
+    slope = ((cy0 + cy1) - (ay0 + ay1)) / 2 / (cx0 - ax0)
+
+    letter = labels == n_id
+    cover = dilate(letter, 3)                       # the letter plus its soft edge
+    ring = dilate(cover, 3) & ~cover & ~dilate(yellow, 2)
+    fill = np.median(a[ring][:, :3], axis=0)        # the box colour around the letter
+
+    pad = 8
+    x0, x1, y0, y1 = int(nx0 - pad), int(nx1 + pad + 1), int(ny0 - pad), int(ny1 + pad + 1)
+    patch = m.crop((x0, y0, x1, y1))
+    matte = Image.fromarray((dilate(letter, 1)[y0:y1, x0:x1] * 255).astype(np.uint8))
+    patch.putalpha(matte.filter(ImageFilter.GaussianBlur(0.7)))
+    patch = patch.transpose(Image.FLIP_LEFT_RIGHT)  # the N reads correctly again...
+    k, xc = 2 * slope, (patch.width - 1) / 2        # ...and is slanted to match the mirrored box
+    patch = patch.transform(patch.size, Image.AFFINE, (1, 0, 0, -k, 1, k * xc), resample=Image.BICUBIC)
+
+    out = a.copy()
+    out[cover, :3] = fill
+    res = Image.fromarray(out.astype(np.uint8), "RGBA")
+    res.alpha_composite(patch, (x0, y0))
+    return res
+
+
+def mirror_sprite(name: str, sprite: Image.Image) -> Image.Image:
+    """Mirror a FLAT sprite left-to-right. Shade the result afterwards with shade_sprite()."""
+    if name in LETTERED:
+        return mirror_keep_letters(sprite)
+    return sprite.convert("RGBA").transpose(Image.FLIP_LEFT_RIGHT)
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
+    OUT_MIRRORED.mkdir(exist_ok=True)
     for path in sorted(SRC.glob("*.png")):
-        shaded = shade_sprite(Image.open(path))
+        flat = Image.open(path)
+        shaded = shade_sprite(flat)
         shaded.save(OUT / path.name, optimize=True)
+        shade_sprite(mirror_sprite(path.stem, flat)).save(OUT_MIRRORED / path.name, optimize=True)
         print(f"{path.stem:8s} {shaded.size}")
 
 

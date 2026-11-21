@@ -4,6 +4,7 @@ Transparent PNG sprites, cropped tight with 4px padding. Each brawler comes in t
 
 - **Flat** (`<name>.png`): the original sprite.
 - **Shaded** (`shaded/<name>.png`): the same design with soft 3D shading, at 2x the size.
+- **Shaded, mirrored** (`shaded_mirrored/<name>.png`): the shaded sprite facing the other way.
 
 | Flat | Shaded | Name | File | Flat size (px) | Scale |
 |:---:|:---:|---|---|---|---|
@@ -27,8 +28,14 @@ The shaded sprites are calculated from the flat ones, so the designs are identic
 colour region (body, wing, hat...) is shaded like a rounded shape, lit from the top left, with
 a few glossy highlights. Outlines and dark features are untouched.
 
-To mirror a brawler, flip the flat sprite first and shade it afterwards, so the light still
-comes from the top left. The TNT should never be mirrored because of its letters.
+## Mirrored sprites
+
+Use the sprites in `shaded_mirrored/` when a brawler should face the other way. Do not flip a
+shaded sprite in the game: its light would flip too and come from the wrong side. The mirrored
+sprites are flipped first and shaded afterwards, so the light comes from the top left in both
+folders.
+
+The mirrored TNT still reads "TNT": after flipping, its N is turned back the right way round.
 
 ## Source
 

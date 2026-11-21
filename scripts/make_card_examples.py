@@ -19,14 +19,13 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from extract_brawlers import dilate, flood
-from shade_brawlers import shade_sprite
+from shade_brawlers import mirror_sprite, shade_sprite
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "examples"
 SIZES = json.loads((ROOT / "brawlers" / "sizes.json").read_text())
 
 S = 2                       # examples are rendered at 2x the card size so they are easy to see
-NO_FLIP = {"tnt"}           # brawlers that must never be mirrored (the TNT has letters on it)
 
 # Height of a full-size (scale 1.0) brawler as a fraction of the card window. Every brawler
 # is drawn at this size times its own scale; a group is only shrunk if it would not fit.
@@ -39,6 +38,15 @@ FORMATIONS = {
     3: [(-0.48, -0.30), (0.48, -0.30), (0.0, 0.18)],
     4: [(0.0, -0.52), (-0.60, -0.16), (0.60, -0.16), (0.0, 0.22)],
     5: [(-0.62, -0.50), (0.62, -0.50), (0.0, -0.14), (-0.66, 0.26), (0.66, 0.26)],
+}
+# Which brawlers of a group are mirrored, in the same order as FORMATIONS. Mixed on purpose,
+# so a group looks alive instead of copy-pasted: neighbours look in different directions.
+MIRRORED = {
+    1: [False],
+    2: [False, True],
+    3: [False, True, False],
+    4: [True, False, True, False],
+    5: [False, True, True, True, False],
 }
 
 # The label font is a placeholder: the first of these that exists is used.
@@ -66,8 +74,8 @@ def shaded(brawler: str, flip: bool = False) -> Image.Image:
         base = Image.open(ROOT / "brawlers" / f"{brawler}.png").convert("RGBA")
         base = base.crop(base.getbbox())
         if flip:
-            base = base.transpose(Image.FLIP_LEFT_RIGHT)
-        _shaded[key] = shade_sprite(base)   # shaded after flipping, so the light stays top-left
+            base = mirror_sprite(brawler, base)
+        _shaded[key] = shade_sprite(base)   # shaded after mirroring, so the light stays top-left
     return _shaded[key]
 
 
@@ -101,7 +109,7 @@ def layout(brawler: str, count: int, unit_h: float, rng: random.Random):
     units = []
     for i, (dx, dy) in enumerate(spots):
         t = (dy - min(ys)) / (max(ys) - min(ys)) if count > 1 else 1.0   # 0 = back row, 1 = front
-        flip = brawler not in NO_FLIP and count > 1 and i % 2 == 1 and dx < 0
+        flip = MIRRORED[count][i]
         jitter = 1.0 + (rng.uniform(-0.04, 0.04) if count > 1 else 0.0)
         spr = fit(shaded(brawler, flip), unit_h * (0.92 + 0.08 * t) * jitter)
         if count > 1:
