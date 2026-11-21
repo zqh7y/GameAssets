@@ -22,11 +22,11 @@ What each card shows:
   slightly different sizes and tilts. The mirrored TNT still reads "TNT".
 - **Grounding:** each brawler has a wide soft shadow plus a small dark one under its feet, the
   back row fades slightly for depth, and there is a soft glow behind the group.
-- **Minimal particle effects:** a few plain flat shapes from [`effects/`](../effects/), tinted
-  in one colour per brawler, with no outlines and no detail. The TNT has a glint and two dots
-  on its fuse, the Mage has a soft blue glow behind it and glints at the staff, and the others
-  have three to five small shapes around the group: feather slivers, leaf slivers, ember dots,
-  mist dots and bubble rings. In the game these would move; the previews show one moment.
+- **Minimal particle effects:** three to five flat shapes per card from
+  [`effects/pieces/`](../effects/pieces/), each brawler using its own cluster: feathers for
+  the Peep, a spark on every TNT fuse, embers for the Dragon, glints at the Mage's staff, mist
+  for the Ghost, leaves for Mr Nut and bubbles for the Octopus. In the game these would move;
+  the previews show one moment.
 - **Label:** gold number and white name, with a dark outline and a drop shadow.
 
 The label font is a placeholder (whatever bold font the script finds), not the game's font.

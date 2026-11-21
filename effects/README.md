@@ -1,42 +1,39 @@
 # Effects
 
-Five plain white shapes that every brawler effect is built from. Transparent PNGs, 128 × 128 px.
+Small particle effects for the brawlers: flat shapes in one or two colours, with no outlines
+and no detail. Transparent PNGs.
 
-| Preview | File | Shape | Used for |
+| Preview | File | Brawler | What it is |
 |:---:|---|---|---|
-| <img src="dot.png" height="40"> | `dot.png` | Filled circle | Embers, sparks, mist |
-| <img src="ring.png" height="40"> | `ring.png` | Thin circle | Bubbles |
-| <img src="glint.png" height="40"> | `glint.png` | Four-point sparkle | Fuse sparks, magic twinkles |
-| <img src="sliver.png" height="40"> | `sliver.png` | Small curved petal | Feathers, leaves |
-| <img src="glow.png" height="40"> | `glow.png` | Soft round light | An aura behind a brawler |
+| <img src="feathers.png" height="72"> | `feathers.png` | Peep | Feathers falling |
+| <img src="spark.png" height="72"> | `spark.png` | TNT | Fuse spark |
+| <img src="fire.png" height="72"> | `fire.png` | Dragon | Fire and embers |
+| <img src="magic.png" height="72"> | `magic.png` | Mage | Magic glints |
+| <img src="mist.png" height="72"> | `mist.png` | Ghost | Mist trailing off |
+| <img src="leaves.png" height="72"> | `leaves.png` | Mr Nut | Leaves falling |
+| <img src="bubbles.png" height="72"> | `bubbles.png` | Octopus | Bubbles |
 
-The previews are white, so they only show up on a dark page theme.
+## Clusters and pieces
 
-## How they are used
+Each file above is a whole cluster, as it was drawn. Every single shape of a cluster is also
+saved on its own in [`pieces/`](pieces/), named `<cluster>_<n>.png` with the biggest shape
+first: `spark_1.png` is the star, `spark_2.png` and up are its dots.
 
-The effects are super minimal on purpose: a few flat shapes in one colour, with no outlines
-and no detail. The shapes are white so the game can tint them with any colour, then move,
-spin, scale and fade them as particles. That is where the life comes from; a still picture
-only shows one moment.
+The pieces are what a game needs: it can move, spin and fade each one as a particle. The
+cards in [`examples/`](../examples/) use three to five pieces per card, placed around the
+brawlers.
 
-| Brawler | Effect | Shapes | Colour |
-|---|---|---|---|
-| Peep | Feathers drifting | 3 slivers | Yellow `(250, 186, 32)` |
-| TNT | Lit fuse | 1 glint and 2 dots on each fuse tip | Orange `(255, 150, 30)` |
-| Dragon | Embers rising | 5 dots | Orange to yellow `(255, 128, 30)` → `(255, 212, 88)` |
-| Mage | Magic aura and twinkles | 1 glow behind, 1 or 2 glints at the staff | Blue `(96, 208, 255)` |
-| Ghost | Mist trailing off | 5 dots, shrinking | Pale blue `(150, 200, 245)` |
-| Mr Nut | Leaves drifting | 3 slivers | Orange `(236, 120, 36)` |
-| Octopus | Bubbles | 3 rings | Blue `(92, 172, 236)` |
+## Source
 
-The colours are strong on purpose: the cards are light, so pale or white particles would
-disappear on them. The exact positions and sizes used in the previews are in
-`scripts/make_card_examples.py`, and the results are in [`examples/`](../examples/).
+The original image is in [`source/`](source/): `effects_greenscreen.jpg`, the 7 clusters in a
+row on a green background.
 
-## Regenerating
+The sheet is small (about 100 px per cluster), so the shapes are traced rather than just cut
+out: each shape is enlarged 3x, its outline is re-sharpened, and it is filled with its exact
+flat colour. That gives crisp sprites with no green fringe.
 
-The shapes are drawn by code. Needs `Pillow`. Run this from the repo root:
+To regenerate everything (needs `numpy` and `Pillow`), run this from the repo root:
 
 ```bash
-python3 scripts/make_effects.py
+python3 scripts/extract_effects.py
 ```

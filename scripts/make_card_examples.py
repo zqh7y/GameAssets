@@ -2,9 +2,9 @@
 
 These are previews only, not game assets. They show the intended look: shaded brawlers at
 their relative sizes (brawlers/sizes.json), standing in groups in the card window, with
-ground shadows, a few small themed effects and a "+N Name" label.
+ground shadows, each brawler's small particle effect and a "+N Name" label.
 
-Input:  cards/*.png, brawlers/*.png, brawlers/sizes.json, effects/*.png
+Input:  cards/*.png, brawlers/*.png, brawlers/sizes.json, effects/pieces/*.png
 Output: examples/*.jpg
 
 Requires: numpy, Pillow
@@ -49,59 +49,52 @@ MIRRORED = {
     5: [False, True, True, True, False],
 }
 
-# Particle effects, super minimal: a few plain flat shapes from effects/ (dot, ring, glint,
-# sliver, glow), each tinted in one colour. No outlines and no detail.
+# Particle effects: a few of the flat shapes from effects/pieces/ per card, kept minimal.
+# Each brawler uses the shapes of its own cluster (feathers for the Peep, spark for the TNT...).
 #
-# Colours are (r, g, b) or (r, g, b, opacity). They are kept strong on purpose: the cards are
-# light, so pale or white particles would disappear on them.
-PEEP_YELLOW = (250, 186, 32)
-LEAF_ORANGE = (236, 120, 36)
-SPARK = (255, 150, 30)
-EMBER_1, EMBER_2, EMBER_3 = (255, 128, 30), (255, 176, 48), (255, 212, 88)
-MAGIC = (96, 208, 255)
-MIST = (150, 200, 245, 225)
-BUBBLE = (92, 172, 236)
-
-# Attached particles sit on a point of the brawler itself:
-#   (shape, colour, x, y, size, who, layer)
+# Attached shapes sit on a point of the brawler itself:
+#   (piece, x, y, size, who)
+#   piece   file name in effects/pieces/, without ".png"
 #   x, y    position in the sprite, 0..1, for a brawler facing its normal way
-#   size    relative to the brawler's height
+#   size    longest side of the shape, relative to the brawler's height
 #   who     "all" = every brawler in the group, "front" = only the one in front
-#   layer   "behind" the brawler, or in "front" of it
 ATTACHED = {
-    "tnt": [("glint", SPARK, 0.41, 0.00, 0.26, "all", "front"),           # a lit fuse on every TNT
-            ("dot", EMBER_2, 0.54, -0.06, 0.055, "all", "front"),
-            ("dot", EMBER_3, 0.30, -0.08, 0.04, "all", "front")],
-    "wizard": [("glow", (*MAGIC, 170), 0.50, 0.52, 1.55, "all", "behind"),    # a magic aura
-               ("glint", MAGIC, 0.97, 0.19, 0.17, "all", "front"),         # and twinkles at the staff
-               ("glint", MAGIC, 0.75, 0.15, 0.09, "front", "front")],
+    "tnt": [("spark_1", 0.41, 0.00, 0.30, "all"),        # a spark on every fuse tip
+            ("spark_2", 0.61, -0.09, 0.07, "front"),     # and a few sparks flying off the front one
+            ("spark_5", 0.23, -0.08, 0.06, "front"),
+            ("spark_9", 0.50, -0.21, 0.045, "front")],
+    "wizard": [("magic_3", 0.97, 0.19, 0.21, "all"),     # a glint at the top of every staff
+               ("magic_2", 0.75, 0.11, 0.15, "front"),
+               ("magic_5", 1.08, 0.38, 0.06, "front")],
 }
-# Floating particles drift around the whole group:
-#   (shape, colour, x, y, size, tilt)
+# Floating shapes drift around the whole group:
+#   (piece, x, y, size, tilt)
 #   x, y    relative to the group's bounding box: 0..1 across and down, so a value below 0
 #           or above 1 is just outside it
-#   size    relative to the brawler's height
-#   tilt    degrees, counter-clockwise
+#   size    longest side of the shape, relative to the brawler's height
+#   tilt    degrees, counter-clockwise, added to the way the shape was drawn
 FLOATING = {
-    "chick": [("sliver", PEEP_YELLOW, -0.04, 0.10, 0.20, 35),              # feathers
-              ("sliver", PEEP_YELLOW, 1.04, 0.34, 0.15, -40),
-              ("sliver", PEEP_YELLOW, 0.56, -0.07, 0.12, 80)],
-    "acorn": [("sliver", LEAF_ORANGE, -0.04, 0.12, 0.26, 30),              # leaves
-              ("sliver", LEAF_ORANGE, 1.04, 0.30, 0.20, -50),
-              ("sliver", LEAF_ORANGE, 0.50, -0.10, 0.16, 75)],
-    "dragon": [("dot", EMBER_1, -0.02, 0.12, 0.085, 0),                    # embers rising
-               ("dot", EMBER_2, 0.02, 0.00, 0.06, 0),
-               ("dot", EMBER_3, -0.01, -0.10, 0.04, 0),
-               ("dot", EMBER_1, 1.02, 0.06, 0.07, 0),
-               ("dot", EMBER_2, 0.99, -0.06, 0.045, 0)],
-    "ghost": [("dot", MIST, -0.07, 0.64, 0.12, 0),                         # mist trailing off
-              ("dot", MIST, -0.12, 0.77, 0.08, 0),
-              ("dot", MIST, -0.15, 0.87, 0.05, 0),
-              ("dot", MIST, 1.07, 0.70, 0.10, 0),
-              ("dot", MIST, 1.12, 0.82, 0.065, 0)],
-    "octopus": [("ring", BUBBLE, -0.03, 0.08, 0.20, 0),                    # bubbles
-                ("ring", BUBBLE, 1.03, 0.28, 0.14, 0),
-                ("ring", BUBBLE, 0.52, -0.10, 0.10, 0)],
+    "chick": [("feathers_1", -0.04, 0.10, 0.34, 0),      # feathers falling
+              ("feathers_4", 1.04, 0.36, 0.22, 0),
+              ("feathers_5", 0.56, -0.07, 0.16, 0),
+              ("feathers_6", 0.97, 0.02, 0.07, 0)],
+    "acorn": [("leaves_1", -0.04, 0.12, 0.26, 0),        # leaves falling
+              ("leaves_3", 1.04, 0.30, 0.22, 0),
+              ("leaves_5", 0.50, -0.10, 0.17, 0),
+              ("leaves_7", 0.93, -0.03, 0.06, 0)],
+    "dragon": [("fire_2", -0.02, 0.12, 0.10, 0),         # embers rising
+               ("fire_3", 0.02, 0.00, 0.075, 0),
+               ("fire_7", -0.01, -0.10, 0.04, 0),
+               ("fire_4", 1.02, 0.06, 0.075, 0),
+               ("fire_6", 0.99, -0.06, 0.045, 0)],
+    "ghost": [("mist_2", -0.07, 0.64, 0.13, 0),          # mist trailing off at the sides
+              ("mist_4", -0.12, 0.77, 0.085, 0),
+              ("mist_6", -0.15, 0.87, 0.05, 0),
+              ("mist_3", 1.07, 0.70, 0.105, 0),
+              ("mist_5", 1.12, 0.82, 0.065, 0)],
+    "octopus": [("bubbles_1", -0.03, 0.08, 0.20, 0),     # bubbles
+                ("bubbles_3", 1.03, 0.28, 0.14, 0),
+                ("bubbles_6", 0.52, -0.10, 0.10, 0)],
 }
 
 # The label font is a placeholder: the first of these that exists is used.
@@ -137,16 +130,14 @@ def shaded(brawler: str, flip: bool = False) -> Image.Image:
 _effects: dict[str, Image.Image] = {}
 
 
-def particle(shape: str, colour: tuple, size: float, angle: float = 0.0) -> Image.Image:
-    """A white shape from effects/, tinted with `colour`, `size` pixels wide, turned by `angle`."""
-    if shape not in _effects:
-        _effects[shape] = Image.open(ROOT / "effects" / f"{shape}.png").convert("RGBA")
-    px = max(6, round(size))
-    alpha = _effects[shape].getchannel("A").resize((px, px), Image.LANCZOS)
-    if len(colour) == 4:
-        alpha = alpha.point(lambda v: v * colour[3] // 255)
-    img = Image.new("RGBA", (px, px), (*colour[:3], 0))
-    img.putalpha(alpha)
+def piece(name: str, size: float, angle: float = 0.0) -> Image.Image:
+    """A shape from effects/pieces/, its longest side `size` pixels, turned by `angle` degrees."""
+    if name not in _effects:
+        img = Image.open(ROOT / "effects" / "pieces" / f"{name}.png").convert("RGBA")
+        _effects[name] = img.crop(img.getbbox())
+    src = _effects[name]
+    k = max(6.0, size) / max(src.size)
+    img = src.resize((max(1, round(src.width * k)), max(1, round(src.height * k))), Image.LANCZOS)
     if angle:
         img = img.rotate(angle, resample=Image.BICUBIC, expand=True)
     return img
@@ -276,26 +267,21 @@ def make_card(card_name: str, brawler: str, count: int, seed: int) -> Image.Imag
     card.alpha_composite(tight.filter(ImageFilter.GaussianBlur(max(2, unit_h * 0.015))))
     order = sorted(placed, key=lambda u: u[2])                   # back to front
 
-    def attached(spr, cx, ground, flip, layer):
-        """Draw this brawler's attached particles that belong to `layer`."""
+    for spr, cx, ground, flip in order:
         left, top = cx - spr.width // 2, ground - spr.height
-        for shape, colour, ax, ay, size, who, where in ATTACHED.get(brawler, []):
-            if where != layer or (who == "front" and spr is not order[-1][0]):
+        card.alpha_composite(spr, (left, top))
+        # Shapes attached to this brawler, drawn right after it so brawlers in front cover them.
+        for name, ax, ay, size, who in ATTACHED.get(brawler, []):
+            if who == "front" and spr is not order[-1][0]:
                 continue
             if flip:
                 ax = 1 - ax
-            stamp(card, particle(shape, colour, size * spr.height), left + ax * spr.width, top + ay * spr.height)
+            stamp(card, piece(name, size * spr.height), left + ax * spr.width, top + ay * spr.height)
 
-    for unit in order:
-        attached(*unit, "behind")
-    for spr, cx, ground, flip in order:
-        card.alpha_composite(spr, (cx - spr.width // 2, ground - spr.height))
-        attached(spr, cx, ground, flip, "front")   # right after it, so brawlers in front cover them
-
-    # Particles floating around the group, kept inside the window.
+    # Shapes floating around the group, kept inside the window.
     gx0, gy0, gw, gh = ox + bx0, oy + by0, bx1 - bx0, by1 - by0
-    for shape, colour, fx, fy, size, tilt in FLOATING.get(brawler, []):
-        img = particle(shape, colour, size * unit_h, tilt)
+    for name, fx, fy, size, tilt in FLOATING.get(brawler, []):
+        img = piece(name, size * unit_h, tilt)
         half = max(img.size) / 2 + 6
         x = min(max(gx0 + fx * gw, wx0 + half), wx1 - half)
         y = min(max(gy0 + fy * gh, wy0 + half), wy1 - half)
