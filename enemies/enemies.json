@@ -3,9 +3,9 @@
     "name": "Beetle Knight",
     "scale": 0.8,
     "still": "still.png",
-    "frame_width": 326,
+    "frame_width": 404,
     "frame_height": 280,
-    "anchor": [163, 274],
+    "anchor": [202, 274],
     "animations": {
       "walk": {
         "file": "walk.png",
@@ -44,7 +44,7 @@
           "frame_width": 152,
           "frame_height": 238,
           "anchor": [76, 119],
-          "at": [-131.4, -126.1],
+          "at": [-154.7, -124.1],
           "draw": "in_front",
           "starts_ms": [290],
           "duration_ms": 340,

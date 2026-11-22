@@ -46,12 +46,15 @@ ENEMIES = {
         "scale": 0.8,          # its size next to the brawlers, as in brawlers/sizes.json (the Mage is 1)
         "height": 260,         # px of its still sprite, like the brawlers' flat sprites
         # The poses of the attack, from the sheet's bottom row. Gemini never drew the strike
-        # itself (the sword stays pulled back), so the strike is made from the ready pose: its
-        # sword and the hand holding it (everything left of `cut_x`) are turned by `turn`
-        # degrees around the hand (`pivot`), so the sword swings forward across the body.
-        # Both are in px of the pose on the sheet, from its top left corner.
+        # itself (the sword stays pulled back), so the strike is made from the ready pose: the
+        # sword and the hand holding it (what is inside the box `take`, without the bit of stick
+        # below row `below`) are taken off and put back in front of the body: the hand, at
+        # `hand`, goes to `to`, and the sword is turned by `turn` degrees and drawn `grow` times
+        # as long, so it swings down past the shield at whoever is in front. All in px of the
+        # pose on the sheet, from its top left corner, facing right as drawn.
         "attack": [0, 1, "strike", 3],
-        "strike": {"pose": 0, "cut_x": 38, "pivot": (25, 122), "turn": -128},
+        "strike": {"pose": 0, "take": (40, 150), "below": 126, "hand": (25, 122), "to": (128, 112),
+                   "turn": -120, "grow": 1.3},
         # The slash: where its middle goes, as parts of the frame's width and height on the
         # striking pose (facing right, as drawn), its longest side at its biggest (px of the
         # frame), and how long before the hit lands it starts.
@@ -92,20 +95,24 @@ def cut_poses(sheet: Path) -> list[list[np.ndarray]]:
 
 
 def strike(pose: np.ndarray, spec: dict) -> np.ndarray:
-    """The ready pose with its sword swung forward: the part left of `cut_x` turned around the hand."""
+    """The ready pose with its sword swung forward, in front of the body (see ENEMIES)."""
     h, w = pose.shape[:2]
-    m = max(h, w) // 2                                     # room for the sword to swing out
-    left = np.arange(w)[None, :] < spec["cut_x"]
-    body, sword = pose.copy(), pose.copy()
-    body[..., 3] = np.where(left, 0, body[..., 3])
-    sword[..., 3] = np.where(left, sword[..., 3], 0)
+    ys, xs = np.mgrid[0:h, 0:w]
+    off = (xs < spec["take"][0]) & (ys < spec["take"][1])     # the sword, the hand and the end of the arm
+    sword, body = pose.copy(), pose.copy()
+    sword[..., 3] = np.where(off & (ys < spec["below"]), sword[..., 3], 0)
+    body[..., 3] = np.where(off, 0, body[..., 3])
+    m = max(h, w)                                              # room for the sword to swing out
     canvas = Image.new("RGBA", (w + 2 * m, h + 2 * m), (0, 0, 0, 0))
     canvas.alpha_composite(Image.fromarray(body, "RGBA"), (m, m))
-    turned = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    turned.alpha_composite(Image.fromarray(sword, "RGBA"), (m, m))
-    px, py = spec["pivot"]
-    turned = turned.convert("RGBa").rotate(spec["turn"], resample=Image.BICUBIC, center=(px + m, py + m))
-    canvas.alpha_composite(turned.convert("RGBA"))       # the sword in front of the body
+    k = spec["grow"]
+    piece = Image.fromarray(sword, "RGBA").crop((0, 0, spec["take"][0], spec["below"])).convert("RGBa")
+    piece = piece.resize((round(piece.width * k), round(piece.height * k)), Image.LANCZOS)
+    (hx, hy), (tx, ty) = spec["hand"], spec["to"]
+    layer = Image.new("RGBa", canvas.size, (0, 0, 0, 0))
+    layer.paste(piece, (round(m + tx - hx * k), round(m + ty - hy * k)))
+    layer = layer.rotate(spec["turn"], resample=Image.BICUBIC, center=(m + tx, m + ty))
+    canvas.alpha_composite(layer.convert("RGBA"))             # the sword in front of the body
     return np.asarray(canvas.crop(canvas.getbbox()))
 
 

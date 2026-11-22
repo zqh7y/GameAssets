@@ -45,9 +45,10 @@ timed and shaded like theirs (see [`scripts/extract_animations.py`](../scripts/e
 and only turned around at the end.
 
 Gemini never drew the strike itself: however it was asked, the sword stayed pulled back. So
-the strike is made from the ready pose: the sword and the hand that holds it are swung forward
-across the body. The third pose of the sheet's bottom row is not used. The slash appears in
-front of the beetle as the hit lands, like the brawlers' attack effects.
+the strike is made from the ready pose: the sword and the hand that holds it are taken off and
+put back in front of the body, swung down past the shield at the brawlers. The third pose of
+the sheet's bottom row is not used. The slash appears in front of the beetle as the hit lands,
+like the brawlers' attack effects.
 
 Its motion is with the brawlers' in [`scripts/brawler_motion.py`](../scripts/brawler_motion.py):
 a waddle for the walk, and for the attack a lunge with a little hop as it winds up.
