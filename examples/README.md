@@ -58,6 +58,17 @@ marches at the brawlers, then winds up and slashes with its twig sword.
 
 ![The Beetle Knight marching and attacking](enemy_beetle.gif)
 
+## A fight in the forest
+
+[`battle_forest.mp4`](battle_forest.mp4) shows how it all fits together (14 seconds). The Mage,
+the Dragon and Peep walk along the forest map, and three Beetle Knights come at them. The map
+stops while they fight, each one against the one across from it, with their attack effects, a
+white flash and a little knock-back when hit, the damage in numbers and a health bar over each
+beetle. Beaten beetles flash, squash and burst into leaves, and the squad walks on. The fight
+itself (who attacks when, how hard) is made up for the preview. One picture of it:
+
+![The Dragon breathing fire at a Beetle Knight](battle_forest.jpg)
+
 ## Size lineup
 
 ![All brawlers at their relative sizes](size_lineup.jpg)
@@ -92,6 +103,12 @@ The enemy previews:
 
 ```bash
 python3 scripts/make_enemies.py
+```
+
+The fight (needs `ffmpeg` for the video):
+
+```bash
+python3 scripts/make_battle.py
 ```
 
 The size lineup and the shading comparison:
