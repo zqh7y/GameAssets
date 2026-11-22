@@ -60,14 +60,22 @@ marches at the brawlers, then winds up and slashes with its twig sword.
 
 ## A fight in the forest
 
-[`battle_forest.mp4`](battle_forest.mp4) shows how it all fits together (14 seconds). The Mage,
-the Dragon and Peep walk along the forest map, and three Beetle Knights come at them. The map
-stops while they fight, each one against the one across from it, with their attack effects, a
-white flash and a little knock-back when hit, the damage in numbers and a health bar over each
-beetle. Beaten beetles flash, squash and burst into leaves, and the squad walks on. The fight
-itself (who attacks when, how hard) is made up for the preview. One picture of it:
+[`battle_forest.mp4`](battle_forest.mp4) shows how it all fits together (12 seconds). All seven
+brawlers walk along the forest map, and four Beetle Knights come at them. The map stops while
+they fight:
 
-![The Dragon breathing fire at a Beetle Knight](battle_forest.jpg)
+- the Ghost, the TNT, Mr Nut and Peep stand in front, each hitting the beetle across from it
+  (the TNT blows up, then pops back)
+- the Mage, the Dragon and the Octopus stand behind and shoot over their heads: magic, a
+  fireball and a splash fly to the beetles and burst there
+- the beetles slash back at the brawlers in front
+
+A hit shows as a white flash and a little knock-back, with the damage in numbers; each beetle
+has a health bar. Beaten beetles flash, squash and burst into leaves, and the squad walks on.
+The fight itself (who attacks when, how hard, the shots) is made up for the preview. One
+picture of it:
+
+![All seven brawlers fighting four Beetle Knights](battle_forest.jpg)
 
 ## Size lineup
 

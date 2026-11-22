@@ -32,5 +32,5 @@ Three of the seven brawler cards, stacked like on the screen. All seven are in [
   - `make_map.py` builds each area's long, looping map from its pictures, with previews
   - `map_motion.py` describes how a map moves: the wind, the plants the brawlers walk through, falling leaves, butterflies and birds
   - `make_enemies.py` builds the enemies from their sheets, the same way as the brawlers' animations, with a moving preview
-  - `make_battle.py` renders a preview of the brawlers fighting Beetle Knights on the forest map
+  - `make_battle.py` renders a preview of all seven brawlers fighting Beetle Knights on the forest map
   - `make_examples.py` renders the size lineup and the flat-vs-shaded comparison in `examples/`

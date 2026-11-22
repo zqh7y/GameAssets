@@ -1,14 +1,16 @@
 """A preview of a fight on the forest map (not a game asset).
 
-The squad walks along the map. Three Beetle Knights come at it, and the map stops while they
-fight: every brawler and every beetle attacks the one across from it, with the effects from
-animations/ and enemies/, a white flash and a little knock-back when hit, the damage in
-numbers, and a health bar over each beetle. Beaten beetles flash, squash and burst into
-leaves. Then the squad walks on.
+All seven brawlers walk along the map. Four Beetle Knights come at them, and the map stops
+while they fight. The Ghost, the TNT, Mr Nut and Peep stand in front, each hitting the beetle
+across from it; the Mage, the Dragon and the Octopus stand behind them and shoot over their
+heads: their attack effect flies to a beetle as a small shot and bursts there. The beetles hit
+back at the brawlers in front. A hit shows as a white flash and a little knock-back, with the
+damage in numbers; each beetle has a health bar. Beaten beetles flash, squash and burst into
+leaves, and the squad walks on.
 
 It shows how the pieces fit together: the map and everything that moves on it (map_motion.py),
 the brawlers' animations (animations/animations.json) and the enemies' (enemies/enemies.json).
-The fight itself (who attacks when, how hard) is made up for the preview.
+The fight itself (who attacks when, how hard, the shots) is made up for the preview.
 
 Output: examples/battle_forest.mp4 (needs ffmpeg) and examples/battle_forest.jpg
 
@@ -16,6 +18,8 @@ Requires: numpy, Pillow
 Run from the repo root:  python3 scripts/make_battle.py
 """
 
+import heapq
+import itertools
 import json
 import math
 import shutil
@@ -36,24 +40,40 @@ SIZE = 0.52              # a brawler of size 1 is drawn at this part of its anim
 WALK_PX_S = 150          # how fast the squad walks
 ENEMY_PX_S = 60          # how fast the beetles walk
 
-# Who fights whom: each brawler (sprite, x and y of its feet on the screen) and the beetle that
-# comes at it, stopping `gap` px in front of it, arriving `arrives` ms after the start. Each
-# side attacks from `first` ms, every `every` ms, and takes `damage` off the other's health
-# (out of 100) with every hit. The brawlers do not lose.
-LANES = [
-    {"brawler": ("dragon", 370, 580), "gap": 140, "arrives": 2700,
-     "attack": {"first": 2950, "every": 1300, "damage": 36}, "enemy_attack": {"first": 3200, "every": 1600}},
-    {"brawler": ("wizard", 330, 470), "gap": 135, "arrives": 3000,
-     "attack": {"first": 3250, "every": 1400, "damage": 29}, "enemy_attack": {"first": 3550, "every": 1600}},
-    {"brawler": ("chick", 400, 680), "gap": 70, "arrives": 3300,
-     "attack": {"first": 3550, "every": 900, "damage": 17}, "enemy_attack": {"first": 3850, "every": 1600}},
+# The beetles: where each one stops on the screen (x, y of its feet) and when it gets there. Each
+# one attacks the brawler in front of it every BEETLE_EVERY ms, from 400 ms after it arrives.
+BEETLES = [
+    {"x": 525, "y": 455, "arrives": 2650},
+    {"x": 492, "y": 545, "arrives": 2800},
+    {"x": 472, "y": 635, "arrives": 2950},
+    {"x": 512, "y": 712, "arrives": 3100},
 ]
+BEETLE_HP = 100
+BEETLE_EVERY = 1600
+
+# The squad: where each brawler stands (x, y of its feet on the screen), the beetle it fights,
+# and when it first attacks, how often and how hard. The ones in front are close enough for
+# their attack to reach. The ones behind are `ranged`: their attack effect flies to the beetle
+# in SHOT_MS as a small shot and bursts there, and once their beetle is beaten they shoot at
+# the nearest one left. The tall ones stand behind, so the small ones stay in sight.
+SQUAD = [
+    {"sprite": "wizard",  "x": 250, "y": 495, "target": 0, "ranged": True,  "first": 3150, "every": 1400, "damage": 26},
+    {"sprite": "ghost",   "x": 400, "y": 455, "target": 0, "ranged": False, "first": 3000, "every": 1200, "damage": 24},
+    {"sprite": "tnt",     "x": 412, "y": 545, "target": 1, "ranged": False, "first": 3300, "every": 2600, "damage": 50},
+    {"sprite": "dragon",  "x": 255, "y": 585, "target": 1, "ranged": True,  "first": 3050, "every": 1300, "damage": 30},
+    {"sprite": "acorn",   "x": 400, "y": 635, "target": 2, "ranged": False, "first": 3350, "every": 1000, "damage": 19},
+    {"sprite": "octopus", "x": 245, "y": 675, "target": 2, "ranged": True,  "first": 3250, "every": 1100, "damage": 22},
+    {"sprite": "chick",   "x": 442, "y": 712, "target": 3, "ranged": False, "first": 3450, "every": 900,  "damage": 16},
+]
+SHOT_MS = 220
 ENEMY = "beetle"
 BRAKE_MS = 500           # the squad slows down and speeds up again over this long
+GONE_MS = 650            # how long the TNT is gone after it bursts, before it pops back
 STOP_MS = 2650           # when the squad has stopped
 AFTER_MS = 600           # how long the squad waits after the last beetle falls
 END_MS = 3600            # how long it walks on after that
 DIE_MS = 450             # a beaten beetle flashes, squashes and fades over this long
+STILL_MS = 3480          # the moment shown in the still picture
 
 
 class Actor:
@@ -88,6 +108,23 @@ class Actor:
         self.attacks, self.hits, self.walking = [], [], []
         self.death = None
         self.hp = 100
+        # The TNT's attack ends as it bursts: it is gone for a moment, then pops back. Standing
+        # still, it uses its last walk pose (see animations/README.md).
+        self.bursts = not meta["animations"]["attack"].get("returns_to_rest", True)
+        self.rest = self.frames["walk"][-1] if self.bursts else self.frames["attack"][-1]
+
+    def back(self, t: float) -> float | None:
+        """For the TNT: None while it is gone after a burst, else how far it has popped back (0 to 1)."""
+        if not self.bursts:
+            return 1.0
+        end = self.meta["animations"]["attack"]["duration_ms"]
+        for s in self.attacks:
+            age = t - s - end
+            if 0 <= age < GONE_MS:
+                return None
+            if GONE_MS <= age < GONE_MS + 160:
+                return (age - GONE_MS) / 160
+        return 1.0
 
     # -- what it is doing
     def state(self, t: float) -> tuple[str, float]:
@@ -112,7 +149,7 @@ class Actor:
         """Its picture at a moment, and its motion (x, y, rotate, scale_x, scale_y)."""
         state, u = self.state(t)
         if state == "idle":
-            frame = self.frames["attack"][-1]                   # the resting pose
+            frame = self.rest
             breathe = 1 + 0.015 * math.sin(2 * math.pi * t / 1400)
             move = (0.0, 0.0, 0.0, 1 / math.sqrt(breathe), breathe)
         else:
@@ -122,8 +159,14 @@ class Actor:
         return frame, move
 
     def draw(self, img: Image.Image, t: float, x: float, y: float) -> None:
+        back = self.back(t)
+        if back is None:
+            return
         frame, (mx, my, rotate, wide, tall) = self.sprite(t)
         push, flash = self.knock(t)
+        if back < 1:                                            # popping back after a burst
+            pop = 0.5 - 0.5 * math.cos(math.pi * back)
+            wide, tall, flash = wide * (0.4 + 0.6 * pop), tall * (0.4 + 0.6 * pop), max(flash, 1 - back)
         opacity = 1.0
         if self.death is not None and t >= self.death:
             age = t - self.death
@@ -141,7 +184,11 @@ class Actor:
         paste(img, pic, round(x - self.at[0]), round(y - self.at[1]))
 
     def shadow(self, d: ImageDraw.ImageDraw, t: float, x: float, y: float) -> None:
+        back = self.back(t)
+        if back is None:
+            return
         _, (mx, my, rotate, wide, tall) = self.sprite(t)
+        wide *= 0.4 + 0.6 * back
         push, _ = self.knock(t)
         w = self.width * 0.72 * wide * (1 + 3 * my * self.k / self.height)
         if self.death is not None and t >= self.death:
@@ -164,8 +211,8 @@ class Fight:
     """The whole preview: the camera, the squad, the beetles, and everything on the map."""
 
     def __init__(self):
-        self.brawlers = [Actor(lane["brawler"][0], enemy=False) for lane in LANES]
-        self.enemies = [Actor(ENEMY, enemy=True) for _ in LANES]
+        self.brawlers = [Actor(spec["sprite"], enemy=False) for spec in SQUAD]
+        self.enemies = [Actor(ENEMY, enemy=True) for _ in BEETLES]
         self.schedule()
         self.count = round(self.total_ms * FPS / 1000)
         self.life = Life("forest", round(WALK_PX_S / FPS), self.count)
@@ -177,30 +224,56 @@ class Fight:
 
     # -- the fight, worked out ahead
     def schedule(self) -> None:
-        """Who attacks when. Each brawler keeps hitting its beetle until the beetle falls; each
-        beetle hits back, as long as it can finish its swing before it falls."""
-        self.numbers = []                                   # (time, target, text, colour)
-        for n, (lane, b, e) in enumerate(zip(LANES, self.brawlers, self.enemies)):
-            b.x, b.y = lane["brawler"][1], lane["brawler"][2]
+        """Who attacks when, played out ahead in time order. A brawler attacks its beetle until
+        the beetle is beaten (a ranged one then picks the nearest beetle left). A beetle hits
+        back at the brawler in front of it, as long as it can finish its swing before it falls."""
+        self.numbers, self.shots = [], []          # (time, target, text, colour); (launch, land, brawler, beetle)
+        for b, spec in zip(self.brawlers, SQUAD):
+            b.x, b.y, b.spec = spec["x"], spec["y"], spec
+        for e, spec in zip(self.enemies, BEETLES):
+            e.hp, e.spec = BEETLE_HP, spec
+        order = itertools.count()
+        queue = [(spec["first"], next(order), "attack", n, -1) for n, spec in enumerate(SQUAD)]
+        heapq.heapify(queue)
+        while queue:
+            t, _, kind, n, j = heapq.heappop(queue)
+            b, spec = self.brawlers[n], SQUAD[n]
             hit_ms = b.meta["animations"]["attack"]["hit_ms"]
-            start = lane["attack"]["first"]
-            while e.death is None:
-                b.attacks.append(start)
-                amount = lane["attack"]["damage"] + (len(e.hits) * 7 + n) % 5 - 2   # a little variety
-                e.hits.append((start + hit_ms, amount))
+            if kind == "attack":
+                alive = [k for k, e in enumerate(self.enemies) if e.death is None or e.death > t]
+                target = spec["target"] if spec["target"] in alive else None
+                if target is None and spec["ranged"] and alive:
+                    target = min(alive, key=lambda k: abs(BEETLES[k]["y"] - spec["y"]))
+                if target is None:
+                    continue
+                b.attacks.append(t)
+                land = t + hit_ms + (SHOT_MS if spec["ranged"] else 0)
+                heapq.heappush(queue, (land, next(order), "hit", n, target))
+                heapq.heappush(queue, (t + spec["every"], next(order), "attack", n, -1))
+            else:
+                e = self.enemies[j]
+                if e.death is not None:
+                    continue                                 # beaten already: the hit goes nowhere
+                amount = spec["damage"] + (len(e.hits) * 7 + n) % 5 - 2      # a little variety
+                e.hits.append((t, amount))
                 e.hp -= amount
-                self.numbers.append((start + hit_ms, e, str(amount), (255, 255, 255)))
+                self.numbers.append((t, e, str(amount), (255, 255, 255)))
+                if spec["ranged"]:
+                    self.shots.append((t - SHOT_MS, t, b, e))
                 if e.hp <= 0:
-                    e.death = start + hit_ms + 60
-                start += lane["attack"]["every"]
+                    e.death = t + 60
+        for j, e in enumerate(self.enemies):
+            front = next(b for b, spec in zip(self.brawlers, SQUAD) if spec["target"] == j and not spec["ranged"])
             attack = e.meta["animations"]["attack"]
-            start = lane["enemy_attack"]["first"]
+            start = BEETLES[j]["arrives"] + 400 + 150 * j
             while start + attack["duration_ms"] <= e.death:
                 e.attacks.append(start)
-                amount = 9 + (len(b.hits) * 5 + n) % 6
-                b.hits.append((start + attack["hit_ms"], amount))
-                self.numbers.append((start + attack["hit_ms"], b, str(amount), (255, 96, 72)))
-                start += lane["enemy_attack"]["every"]
+                hit = start + attack["hit_ms"]
+                if front.back(hit) == 1.0:                     # the TNT may be gone, after a burst
+                    amount = 9 + (len(front.hits) * 5 + j) % 6
+                    front.hits.append((hit, amount))
+                    self.numbers.append((hit, front, str(amount), (255, 96, 72)))
+                start += BEETLE_EVERY
         last = max(e.death for e in self.enemies)
         self.resume_ms = last + DIE_MS + AFTER_MS
         self.total_ms = self.resume_ms + BRAKE_MS + END_MS
@@ -233,12 +306,11 @@ class Fight:
         return float(self.cams[j] + (self.cams[min(j + 1, self.count)] - self.cams[j]) * (i - j))
 
     def place(self) -> None:
-        """Every beetle walks in from the right and stops across from its brawler."""
-        for lane, e in zip(LANES, self.enemies):
-            name, x, y = lane["brawler"]
-            e.stop = self.stopped_at + x + lane["gap"]          # on the map
-            e.y = y
-            e.arrives = lane["arrives"]
+        """Every beetle walks in from the right and stops across from the brawlers in front."""
+        for spec, e in zip(BEETLES, self.enemies):
+            e.stop = self.stopped_at + spec["x"]                  # on the map
+            e.y = spec["y"]
+            e.arrives = spec["arrives"]
             e.walking = [(0, e.arrives)]
 
     def enemy_x(self, e: Actor, t: float) -> float:
@@ -391,7 +463,7 @@ class Fight:
             if -30 < x < life.screen + 30:
                 pic = spun(sprite, angle, flip, opacity)
                 paste(img, pic, round(x - pic.width / 2), round(y - pic.height / 2))
-        self.attack_effects(img, t, actors)
+        self.attack_effects(img, t, actors, where)
         self.health_bars(img, t, actors)
         self.damage_numbers(img, t, where)
         for f, sx, y, h, wings, angle in flies:
@@ -424,9 +496,9 @@ class Fight:
                         x = self.cam(began) + b.x + e["at"][0] * b.k - icam
                         paste(img, pic, round(x - b.at[0]), round(b.y + e["at"][1] * b.k - b.at[1]))
 
-    def attack_effects(self, img: Image.Image, t: float, actors: list) -> None:
+    def attack_effects(self, img: Image.Image, t: float, actors: list, where: dict) -> None:
         for a, x, y in actors:
-            if "attack" not in a.effects:
+            if "attack" not in a.effects or (not a.enemy and a.spec["ranged"]):
                 continue
             e, cells, anchor = a.effects["attack"]
             for s in a.attacks:
@@ -437,23 +509,45 @@ class Fight:
                 pic = posed(cells[motion.frame_at(e, age)], anchor, (0.0, 0.0, 0.0, grow, grow), a.canvas, a.at)
                 pic.putalpha(pic.getchannel("A").point(lambda v: round(v * opacity)))
                 paste(img, pic, round(x + e["at"][0] * a.k - a.at[0]), round(y + e["at"][1] * a.k - a.at[1]))
+        # shots: the first step of the effect flies from the brawler to the beetle, then the
+        # whole effect plays there
+        for launch, land, b, target in self.shots:
+            e, cells, anchor = b.effects["attack"]
+            tx, ty = where[id(target)]
+            tx, ty = tx - target.width * 0.25, ty + target.top * 0.5        # the middle of the beetle's front
+            if launch <= t < land:
+                u = (t - launch) / (land - launch)
+                sx, sy = b.x + e["at"][0] * b.k, b.y + e["at"][1] * b.k
+                px, py = sx + (tx - sx) * u, sy + (ty - sy) * u - 40 * math.sin(math.pi * u)
+                pic = cells[0] if cells[0].getbbox() else cells[1]
+                pic = pic.crop(pic.getbbox())
+                pic = resized(pic, (max(1, round(pic.width * 0.8)), max(1, round(pic.height * 0.8))))
+                paste(img, pic, round(px - pic.width / 2), round(py - pic.height / 2))
+            age = t - land
+            if 0 <= age < e["duration_ms"]:
+                grow, opacity = motion.motion_at(e, age)
+                pic = posed(cells[motion.frame_at(e, age)], anchor, (0.0, 0.0, 0.0, grow, grow), b.canvas, b.at)
+                pic.putalpha(pic.getchannel("A").point(lambda v: round(v * opacity)))
+                if e.get("frame_width") and anchor[0] < cells[0].width * 0.3:     # fire grows forward from its tip
+                    tx -= target.width * 0.2
+                paste(img, pic, round(tx - b.at[0]), round(ty - b.at[1]))
 
     def health_bars(self, img: Image.Image, t: float, actors: list) -> None:
         d = ImageDraw.Draw(img)
         for a, x, y in actors:
             if not a.enemy or t < a.arrives - 400:
                 continue
-            hp = 100 - sum(h[1] for h in a.hits if h[0] <= t)
+            hp = BEETLE_HP - sum(h[1] for h in a.hits if h[0] <= t)
             fade = 1.0 if a.death is None or t < a.death else max(0.0, 1 - (t - a.death) / 200)
             if fade <= 0:
                 continue
-            w, h = 58, 9
+            w, h = 46, 8
             top = y + a.top - 16
             left = x - w / 2
             alpha = round(255 * fade)
             d.rounded_rectangle((left - 2, top - 2, left + w + 2, top + h + 2), radius=5, fill=(58, 30, 14, alpha))
             d.rounded_rectangle((left, top, left + w, top + h), radius=4, fill=(96, 60, 40, alpha))
-            fill = max(0.0, hp / 100) * w
+            fill = max(0.0, hp / BEETLE_HP) * w
             if fill > 2:
                 d.rounded_rectangle((left, top, left + fill, top + h), radius=4, fill=(112, 214, 74, alpha))
                 d.rounded_rectangle((left + 2, top + 1, left + max(fill - 2, 3), top + 3), radius=2,
@@ -467,7 +561,7 @@ class Fight:
             x, y = where[id(target)]
             pop = 1 + 0.45 * max(0.0, 1 - age / 140)
             rise = 46 * (1 - (1 - age / 800) ** 2)
-            pic = number(text, colour, round(30 * pop * (0.85 if not target.enemy else 1.0)))
+            pic = number(text, colour, round(26 * pop * (0.85 if not target.enemy else 1.0)))
             if age > 550:
                 pic.putalpha(pic.getchannel("A").point(lambda v: round(v * (1 - (age - 550) / 250))))
             side = (n * 37) % 30 - 15
@@ -479,10 +573,8 @@ def main() -> None:
     print(f"fight: {fight.count} pictures, {fight.total_ms / 1000:.1f} s; beetles fall at "
           f"{', '.join(str(round(e.death)) for e in fight.enemies)} ms")
     EXAMPLES.mkdir(exist_ok=True)
-    # the still: just as the Dragon's second fire breath lands
-    dragon = fight.brawlers[0]
-    still_ms = dragon.attacks[1] + dragon.meta["animations"]["attack"]["hit_ms"] + 60
-    fight.frame(round(still_ms * FPS / 1000)).save(EXAMPLES / "battle_forest.jpg", quality=90)
+    # the still: early in the fight, with everyone in sight and at it
+    fight.frame(round(STILL_MS * FPS / 1000)).save(EXAMPLES / "battle_forest.jpg", quality=90)
 
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
