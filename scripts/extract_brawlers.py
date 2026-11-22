@@ -119,13 +119,17 @@ def window_stack(arr: np.ndarray, ys: np.ndarray, xs: np.ndarray, r: int) -> np.
     return np.stack(out, axis=1)
 
 
-def key_green(path: Path, remove_shadows: bool = False) -> np.ndarray:
+def key_green(path: Path | np.ndarray, remove_shadows: bool = False) -> np.ndarray:
     """Cut the art out of a green screen. Returns an RGBA array.
 
+    path: the image file, or the image itself as an RGB array.
     remove_shadows: also remove shadows that were drawn on the screen (darker patches of
     the same green, usually under a character's feet).
     """
-    rgb = np.asarray(Image.open(path).convert("RGB")).astype(np.float32)
+    if isinstance(path, np.ndarray):
+        rgb = path.astype(np.float32)
+    else:
+        rgb = np.asarray(Image.open(path).convert("RGB")).astype(np.float32)
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
     greenness = g - np.maximum(r, b)
 
