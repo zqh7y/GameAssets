@@ -15,7 +15,7 @@ it moves into the main project repo.
   - `source/`: the original images
 - [`cards/`](cards/): backgrounds for the "choose a card" screen (basic and jackpot), with the original in `cards/source/`
 - [`effects/`](effects/): small flat particle effects, one cluster per brawler, plus every single shape in `effects/pieces/` and the original in `effects/source/`
-- [`animations/`](animations/): walk and attack animations for every brawler: 4 drawn poses each, plus the smooth motion that plays on top of them, in `animations.json`. The originals are in `animations/source/`
+- [`animations/`](animations/): walk and attack animations for every brawler: 4 drawn poses each, the smooth motion that plays on top of them, and the effect of each attack (fire, a spark...). `animations.json` describes how to play them. The originals are in `animations/source/`
 - [`examples/`](examples/): previews of how the brawlers look on the cards and in motion (not game assets)
 - [`scripts/`](scripts/): helper scripts
   - `extract_brawlers.py` cuts the brawler sprites out of their source images
@@ -24,4 +24,5 @@ it moves into the main project repo.
   - `extract_effects.py` traces the particle effects out of their source image
   - `extract_animations.py` turns the animation sheets into sprite strips and a moving preview
   - `brawler_motion.py` describes the smooth motion of every brawler's walk and attack
+  - `attack_effects.py` cuts the attack effects out of their sheet and fits each one to its brawler
   - `make_card_examples.py` renders the card previews in `examples/`

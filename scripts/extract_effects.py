@@ -88,7 +88,22 @@ def flat_colours(pixels: np.ndarray, bg: np.ndarray) -> np.ndarray:
                 blended = True
         if not blended:
             keep.append([colour, count])
-    return np.array([g[0] for g in keep], dtype=np.float32)
+    # Grouping can leave two versions of one colour (the same blue, once with a little green
+    # from the screen in it). Join colours that are still close, the most common first.
+    joined: list[list] = []
+    for colour, count in keep:
+        for g in joined:
+            if np.linalg.norm(g[0] - colour) < MERGE:
+                g[0] = (g[0] * g[1] + colour * count) / (g[1] + count)
+                g[1] += count
+                break
+        else:
+            joined.append([colour.copy(), count])
+    colours = np.array([g[0] for g in joined], dtype=np.float32)
+    # The art has no green in it, so a colour with more green than red or blue has picked
+    # that up from the screen. Thin shapes do: take the extra green out.
+    colours[:, 1] = np.minimum(colours[:, 1], np.maximum(colours[:, 0], colours[:, 2]))
+    return colours
 
 
 def resize(arr: np.ndarray, scale: int) -> np.ndarray:

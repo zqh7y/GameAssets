@@ -7,6 +7,8 @@ Source (in animations/source/):
 Output, per brawler, in animations/<brawler>/:
   - walk.png, attack.png                    4 frames side by side, shaded like the still sprites
   - walk_mirrored.png, attack_mirrored.png  the same, facing the other way
+  - attack_effect.png                       the effect of the attack (fire, a spark...), in 4 steps;
+                                            cut from source/attack_effects.png by attack_effects.py
 plus animations/animations.json (frame size, anchor point, timing and smooth motion for
 every brawler) and a moving preview of all brawlers in examples/animations.gif.
 
@@ -41,6 +43,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+import attack_effects
 import brawler_motion as motion
 from extract_brawlers import dilate, key_green, label
 from shade_brawlers import LETTERED, letter_labels, mirror_sprite, shade_sprite
@@ -359,15 +362,16 @@ def preview(built: dict[str, dict]) -> None:
     """
     order = [b for b in ORDER if b in built] + sorted(b for b in built if b not in ORDER)
     big = 2                                      # drawn at twice the size and scaled down, for clean edges
-    tile, gutter, name_h, pad = 170, 96, 42, 10
-    width = gutter + tile * len(order) + pad
-    height = pad + tile * 2 + name_h
+    tile, tall_tile, gutter, name_h, pad = 215, 170, 96, 42, 10       # tiles are wide: effects need room
+    width = gutter + tile * len(order) + 3 * pad
+    height = pad + tall_tile * 2 + name_h
     step_ms, total_ms = 40, 2 * motion.WALK_MS   # 25 pictures a second, two walk cycles
     attack_from = 120                            # the attack starts a moment after the loop does
     sand, brown = (236, 214, 178, 255), (92, 52, 28, 255)
     font = load_font(22 * big)
     canvas = (round(tile * big * 1.7),) * 2      # room for a lunge beyond the tile
-    at = (canvas[0] / 2, canvas[1] * 0.80)       # where the anchor sits on that canvas
+    at = (canvas[0] / 2, canvas[1] * 0.80)       # where a brawler's anchor sits on that canvas
+    middle = (canvas[0] / 2, canvas[1] / 2)      # where an effect's anchor sits on it
     still = (0.0, 0.0, 0.0, 1.0, 1.0)
 
     # Scale every brawler to fit a tile, and measure its ground shadow.
@@ -375,7 +379,7 @@ def preview(built: dict[str, dict]) -> None:
     for b in order:
         frames, meta = built[b]["frames"], built[b]["meta"]
         fw, fh = meta["frame_width"], meta["frame_height"]
-        k = big * min((tile - 24) / fw, (tile - 40) / fh)
+        k = big * min((tile - 24) / fw, (tall_tile - 40) / fh)
         size = (round(fw * k), round(fh * k))
         box = frames["walk"][0].getbbox()
         small[b] = {
@@ -385,37 +389,60 @@ def preview(built: dict[str, dict]) -> None:
             "shadow": (box[2] - box[0]) * k * 0.72,
             "height": fh * k,
         }
+        if "effect" in built[b]:
+            cells = built[b]["effect"]
+            small[b]["effect"] = [resized(c, (round(c.width * k), round(c.height * k))) for c in cells]
+            small[b]["effect_anchor"] = tuple(v * k for v in meta["animations"]["attack"]["effect"]["anchor"])
 
     def scene(ms: int) -> Image.Image:
         img = Image.new("RGBA", (width * big, height * big), sand)
         shadows = Image.new("RGBA", img.size, (0, 0, 0, 0))
         ds = ImageDraw.Draw(shadows)
-        sprites = []
+        sprites, effects = [], []
         for col, b in enumerate(order):
             look, anims = small[b], built[b]["meta"]["animations"]
             for row, name in enumerate(ROWS):
                 anim, t = anims[name], ms if name == "walk" else ms - attack_from
+                cx = (gutter + tile * col + tile / 2) * big
+                ground = (pad + tall_tile * (row + 1) - 18) * big
+
+                # The effect starts when the hit lands and stays where it started. The preview
+                # loops, so an effect that runs past the end carries on at the start.
+                effect, step = anim.get("effect") if name == "attack" else None, None
+                if effect and (t - effect["start_ms"]) % total_ms < effect["duration_ms"]:
+                    te = (t - effect["start_ms"]) % total_ms
+                    step = motion.frame_at(effect, te)
+                    grow, opacity = motion.motion_at(effect, te)
+                    picture = posed(look["effect"][step], look["effect_anchor"], (0.0, 0.0, 0.0, grow, grow),
+                                    canvas, middle)
+                    picture.putalpha(picture.getchannel("A").point(lambda v: round(v * opacity)))
+                    effects.append((picture, round(cx + effect["at"][0] * look["k"] - middle[0]),
+                                    round(ground + effect["at"][1] * look["k"] - middle[1])))
+
                 if name == "walk" or 0 <= t < anim["duration_ms"]:
                     frame, move = look["frames"][name][motion.frame_at(anim, t)], motion.motion_at(anim, t)
                 elif anim["returns_to_rest"]:
                     frame, move = look["frames"]["attack"][-1], still      # resting between attacks
-                else:
-                    frame, move = look["frames"]["walk"][-1], still        # the TNT starts over
+                elif step is not None and step < 2:                        # the TNT: still swollen as it starts to burst,
+                    frame, move = look["frames"]["attack"][-1], motion.motion_at(anim, anim["duration_ms"])
+                elif step == 2:                                            # gone in the blast,
+                    continue
+                else:                                                      # and back for the next round
+                    frame, move = look["frames"]["walk"][-1], still
                 x, y, rotate, wide, tall = move
                 x, y = x * look["k"], y * look["k"]
-                cx = (gutter + tile * col + tile / 2) * big
-                ground = (pad + tile * (row + 1) - 18) * big
                 sw = look["shadow"] * wide * (1 + 3 * y / look["height"])   # smaller while off the ground
                 ds.ellipse((cx + x - sw / 2, ground - sw * 0.13, cx + x + sw / 2, ground + sw * 0.09),
                            fill=(96, 52, 12, 115))
                 sprite = posed(frame, look["anchor"], (x, y, rotate, wide, tall), canvas, at)
                 sprites.append((sprite, round(cx - at[0]), round(ground - at[1])))
         img.alpha_composite(shadows.filter(ImageFilter.GaussianBlur(4 * big)))
-        for sprite, x, y in sprites:
+        for sprite, x, y in sprites + effects:                    # effects go on top of the brawlers
             put(img, sprite, x, y)
         d = ImageDraw.Draw(img)
         for row, title in enumerate(("Walk", "Attack")):
-            d.text(((gutter / 2 + 4) * big, (pad + tile * row + tile / 2) * big), title, font=font, fill=brown, anchor="mm")
+            d.text(((gutter / 2 + 4) * big, (pad + tall_tile * row + tall_tile / 2) * big), title, font=font,
+                   fill=brown, anchor="mm")
         for col, b in enumerate(order):
             d.text(((gutter + tile * col + tile / 2) * big, (height - name_h / 2 - 3) * big),
                    built[b]["meta"]["name"], font=font, fill=brown, anchor="mm")
@@ -441,6 +468,9 @@ def main() -> None:
     if not sheets:
         raise SystemExit("no sheets in animations/source/")
     built = {s.stem: build(s.stem) for s in sheets}
+    for brawler, effect in attack_effects.build({b: v["meta"] for b, v in built.items()}).items():
+        built[brawler]["effect"] = effect["frames"]
+        built[brawler]["meta"]["animations"]["attack"]["effect"] = effect["meta"]
     (OUT / "animations.json").write_text(as_json({b: v["meta"] for b, v in built.items()}))
     preview(built)
 

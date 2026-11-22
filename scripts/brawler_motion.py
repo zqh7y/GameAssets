@@ -17,6 +17,9 @@ centre of its body on the ground), then moved. For a mirrored strip, flip the si
 rotate.
 
 The poses change at the moments the sprite moves fastest, where the eye does not catch it.
+
+An attack effect (fire, a spark...) has a small motion of its own: it keeps growing a little
+all the way through, and fades out at the end.
 """
 
 import math
@@ -165,6 +168,18 @@ def attack(brawler: str, height: int) -> dict[str, list[float]]:
     return _tracks(rows)
 
 
+# ---------------------------------------------------------------- attack effects
+
+def effect() -> dict[str, list[float]]:
+    """How an attack effect grows and fades over its life, as tracks: scale and opacity."""
+    scale, opacity = [], []
+    for i in range(SAMPLES + 1):
+        u = i / SAMPLES
+        scale.append(round(0.90 + 0.20 * slow_down(u), 4))                    # grows all the way, fast at first
+        opacity.append(round(1 - smooth((u - 0.62) / 0.38), 3) + 0.0)        # solid, then fades over the last third
+    return {"scale": scale, "opacity": opacity}
+
+
 # ---------------------------------------------------------------- for animations.json and players
 
 def _frame_ms(starts: list[float], duration: int) -> list[int]:
@@ -196,7 +211,7 @@ def animations(brawler: str, height: int) -> dict[str, dict]:
 def frame_at(animation: dict, ms: float) -> int:
     """Which drawn pose shows at this moment."""
     duration = animation["duration_ms"]
-    ms = ms % duration if animation["loop"] else min(max(ms, 0), duration)
+    ms = ms % duration if animation.get("loop") else min(max(ms, 0), duration)
     for i, length in enumerate(animation["frame_ms"]):
         if ms < length:
             return i
@@ -204,12 +219,15 @@ def frame_at(animation: dict, ms: float) -> int:
     return len(animation["frame_ms"]) - 1
 
 
-def motion_at(animation: dict, ms: float) -> tuple[float, float, float, float, float]:
-    """(x, y, rotate, scale_x, scale_y) at this moment."""
+def motion_at(animation: dict, ms: float) -> tuple[float, ...]:
+    """The value of every motion track at this moment, in the order the tracks are listed.
+
+    For a brawler's animation that is (x, y, rotate, scale_x, scale_y); for an attack effect,
+    (scale, opacity).
+    """
     duration = animation["duration_ms"]
-    u = (ms % duration) / duration if animation["loop"] else _unit(ms / duration)
+    u = (ms % duration) / duration if animation.get("loop") else _unit(ms / duration)
     at = u * SAMPLES
     i = min(int(at), SAMPLES - 1)
     part = at - i
-    return tuple(animation["motion"][name][i] * (1 - part) + animation["motion"][name][i + 1] * part
-                 for name in TRACKS)
+    return tuple(track[i] * (1 - part) + track[i + 1] * part for track in animation["motion"].values())
