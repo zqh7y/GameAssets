@@ -1,0 +1,247 @@
+{
+  "acorn": {
+    "name": "Mr Nut",
+    "frame_width": 298,
+    "frame_height": 238,
+    "anchor": [
+      149,
+      232
+    ],
+    "animations": {
+      "walk": {
+        "file": "walk.png",
+        "mirrored_file": "walk_mirrored.png",
+        "frames": 4,
+        "loop": true,
+        "frame_ms": [
+          130,
+          130,
+          130,
+          130
+        ]
+      },
+      "attack": {
+        "file": "attack.png",
+        "mirrored_file": "attack_mirrored.png",
+        "frames": 4,
+        "loop": false,
+        "frame_ms": [
+          130,
+          70,
+          150,
+          130
+        ]
+      }
+    }
+  },
+  "chick": {
+    "name": "Peep",
+    "frame_width": 242,
+    "frame_height": 273,
+    "anchor": [
+      121,
+      267
+    ],
+    "animations": {
+      "walk": {
+        "file": "walk.png",
+        "mirrored_file": "walk_mirrored.png",
+        "frames": 4,
+        "loop": true,
+        "frame_ms": [
+          130,
+          130,
+          130,
+          130
+        ]
+      },
+      "attack": {
+        "file": "attack.png",
+        "mirrored_file": "attack_mirrored.png",
+        "frames": 4,
+        "loop": false,
+        "frame_ms": [
+          130,
+          70,
+          150,
+          130
+        ]
+      }
+    }
+  },
+  "dragon": {
+    "name": "Dragon",
+    "frame_width": 282,
+    "frame_height": 261,
+    "anchor": [
+      141,
+      255
+    ],
+    "animations": {
+      "walk": {
+        "file": "walk.png",
+        "mirrored_file": "walk_mirrored.png",
+        "frames": 4,
+        "loop": true,
+        "frame_ms": [
+          130,
+          130,
+          130,
+          130
+        ]
+      },
+      "attack": {
+        "file": "attack.png",
+        "mirrored_file": "attack_mirrored.png",
+        "frames": 4,
+        "loop": false,
+        "frame_ms": [
+          130,
+          70,
+          150,
+          130
+        ]
+      }
+    }
+  },
+  "ghost": {
+    "name": "Ghost",
+    "frame_width": 336,
+    "frame_height": 318,
+    "anchor": [
+      168,
+      312
+    ],
+    "animations": {
+      "walk": {
+        "file": "walk.png",
+        "mirrored_file": "walk_mirrored.png",
+        "frames": 4,
+        "loop": true,
+        "frame_ms": [
+          130,
+          130,
+          130,
+          130
+        ]
+      },
+      "attack": {
+        "file": "attack.png",
+        "mirrored_file": "attack_mirrored.png",
+        "frames": 4,
+        "loop": false,
+        "frame_ms": [
+          130,
+          70,
+          150,
+          130
+        ]
+      }
+    }
+  },
+  "octopus": {
+    "name": "Octopus",
+    "frame_width": 334,
+    "frame_height": 243,
+    "anchor": [
+      167,
+      237
+    ],
+    "animations": {
+      "walk": {
+        "file": "walk.png",
+        "mirrored_file": "walk_mirrored.png",
+        "frames": 4,
+        "loop": true,
+        "frame_ms": [
+          130,
+          130,
+          130,
+          130
+        ]
+      },
+      "attack": {
+        "file": "attack.png",
+        "mirrored_file": "attack_mirrored.png",
+        "frames": 4,
+        "loop": false,
+        "frame_ms": [
+          130,
+          70,
+          150,
+          130
+        ]
+      }
+    }
+  },
+  "tnt": {
+    "name": "TNT",
+    "frame_width": 280,
+    "frame_height": 333,
+    "anchor": [
+      140,
+      327
+    ],
+    "animations": {
+      "walk": {
+        "file": "walk.png",
+        "mirrored_file": "walk_mirrored.png",
+        "frames": 4,
+        "loop": true,
+        "frame_ms": [
+          130,
+          130,
+          130,
+          130
+        ]
+      },
+      "attack": {
+        "file": "attack.png",
+        "mirrored_file": "attack_mirrored.png",
+        "frames": 4,
+        "loop": false,
+        "frame_ms": [
+          130,
+          70,
+          150,
+          130
+        ]
+      }
+    }
+  },
+  "wizard": {
+    "name": "Mage",
+    "frame_width": 376,
+    "frame_height": 316,
+    "anchor": [
+      188,
+      310
+    ],
+    "animations": {
+      "walk": {
+        "file": "walk.png",
+        "mirrored_file": "walk_mirrored.png",
+        "frames": 4,
+        "loop": true,
+        "frame_ms": [
+          130,
+          130,
+          130,
+          130
+        ]
+      },
+      "attack": {
+        "file": "attack.png",
+        "mirrored_file": "attack_mirrored.png",
+        "frames": 4,
+        "loop": false,
+        "frame_ms": [
+          130,
+          70,
+          150,
+          130
+        ]
+      }
+    }
+  }
+}

@@ -120,6 +120,8 @@ def mirror_keep_letters(sprite: Image.Image) -> Image.Image:
         if len(xs) > 60:  # ignore specks
             letters.append((xs.mean(), i, xs.min(), xs.max(), ys.min(), ys.max()))
     letters.sort()
+    if not letters:
+        return m             # this pose shows no letters (they can be hidden in an animation frame)
     if len(letters) != 3:
         raise SystemExit(f"expected 3 letters on the sprite, found {len(letters)}")
     (_, _, ax0, _, ay0, ay1), (_, n_id, nx0, nx1, ny0, ny1), (_, _, cx0, _, cy0, cy1) = letters

@@ -31,6 +31,13 @@ What each card shows:
 
 The label font is a placeholder (whatever bold font the script finds), not the game's font.
 
+## Animations
+
+The walk (top) and attack (bottom) of every brawler, from [`animations/`](../animations/).
+Every brawler is drawn at the same size here, so the motion is easy to judge.
+
+![All brawlers walking and attacking](animations.gif)
+
 ## Size lineup
 
 ![All brawlers at their relative sizes](size_lineup.jpg)
@@ -47,4 +54,10 @@ Needs `numpy` and `Pillow`. Run this from the repo root:
 
 ```bash
 python3 scripts/make_card_examples.py
+```
+
+The animation preview comes from a different script:
+
+```bash
+python3 scripts/extract_animations.py
 ```
