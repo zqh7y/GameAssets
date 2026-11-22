@@ -12,6 +12,7 @@ and a moving preview of all brawlers in examples/animations.gif.
 
 What happens to a sheet:
   1. The 8 poses are cut out of the green screen. Shadows drawn under the feet are removed.
+     A TNT pose that was drawn without its letters gets them back from the pose next to it.
   2. They are brought to one size: the walk poses are made equal to each other, the attack
      poses keep the sizes they were drawn at (a pose can be bigger on purpose, like the TNT
      puffing up), and the whole sheet is scaled to the size of the brawler's still sprite.
@@ -35,7 +36,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from extract_brawlers import dilate, key_green, label
-from shade_brawlers import mirror_sprite, shade_sprite
+from shade_brawlers import LETTERED, letter_labels, mirror_sprite, shade_sprite
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "animations" / "source"
@@ -107,6 +108,77 @@ def scaled(pose: np.ndarray, k: float) -> np.ndarray:
     return np.asarray(resized(Image.fromarray(pose, "RGBA"), size))
 
 
+# ---------------------------------------------------------------- repairs
+
+def face_marks(pose: np.ndarray) -> list[tuple[float, float, np.ndarray]]:
+    """Small dark marks drawn on a pose's body (eyes and the like): (x, y, mask), lowest first."""
+    a = pose.astype(np.int32)
+    solid = a[..., 3] > 200
+    labels, n = label((a[..., :3].max(axis=-1) < 90) & solid)
+    out = []
+    for i in range(1, n + 1):
+        mask = labels == i
+        ys, xs = np.nonzero(mask)
+        small = len(xs) >= 25 and np.ptp(xs) < 0.3 * pose.shape[1] and np.ptp(ys) < 0.3 * pose.shape[0]
+        if small and solid[dilate(mask, 3)].all():            # on the body, not at its edge
+            out.append((float(xs.mean()), float(ys.mean()), mask))
+    return sorted(out, key=lambda m: -m[1])
+
+
+def restore_letters(row: list[np.ndarray], brawler: str, row_name: str) -> list[np.ndarray]:
+    """Give a pose that lost its letters the letters of the pose next to it.
+
+    The letters go where they sit on that pose, measured from the eyes, and anything else
+    drawn in that spot is removed first. On the TNT sheet, one attack pose was drawn with a
+    second pair of squinting eyes where "TNT" should be, so the box seemed to have four eyes.
+    """
+    lettered = [len(letter_labels(p)[1]) == 3 for p in row]
+    out = list(row)
+    for i, pose in enumerate(row):
+        donors = sorted((j for j in range(len(row)) if lettered[j]), key=lambda j: (abs(j - i), -j))
+        if lettered[i] or not donors:
+            continue
+        donor = row[donors[0]]                                 # the nearest pose, the next one first
+        marks, donor_eyes = face_marks(pose), face_marks(donor)[:2]
+        eyes, others = marks[:2], marks[2:]                    # the eyes are the lowest two marks
+        if len(eyes) < 2 or len(donor_eyes) < 2:
+            continue
+
+        def pair(two: list) -> tuple[np.ndarray, float]:
+            """The middle of two eyes, and the distance between them."""
+            (x1, y1, _), (x2, y2, _) = two
+            return np.array([(x1 + x2) / 2, (y1 + y2) / 2]), float(np.hypot(x1 - x2, y1 - y2))
+
+        (to, gap), (frm, donor_gap) = pair(eyes), pair(donor_eyes)
+        k = gap / donor_gap
+
+        # The letters of the donor, with a soft edge, at this pose's size.
+        labels, ids = letter_labels(donor)
+        letters = np.isin(labels, ids)
+        ys, xs = np.nonzero(letters)
+        x0, x1, y0, y1 = xs.min() - 4, xs.max() + 5, ys.min() - 4, ys.max() + 5
+        patch = Image.fromarray(donor[y0:y1, x0:x1], "RGBA")
+        matte = Image.fromarray((dilate(letters, 1)[y0:y1, x0:x1] * 255).astype(np.uint8))
+        patch.putalpha(matte.filter(ImageFilter.GaussianBlur(0.7)))
+        patch = resized(patch, (round(patch.width * k), round(patch.height * k)))
+        px, py = (int(v) for v in (to + k * (np.array([x0, y0]) - frm)).round())
+
+        # Paint over whatever was drawn where the letters go, then put the letters there.
+        a = pose.astype(np.int32)
+        dark = a[..., :3].max(axis=-1) < 90
+        fixed = pose.copy()
+        for mx, my, mask in others:
+            if px <= mx < px + patch.width and py <= my < py + patch.height:
+                cover = dilate(mask, 3)
+                ring = dilate(cover, 4) & ~cover & ~dilate(dark, 1) & (a[..., 3] > 200)
+                fixed[cover, :3] = np.median(a[ring][:, :3], axis=0)
+        img = Image.fromarray(fixed, "RGBA")
+        img.alpha_composite(patch, (px, py))
+        out[i] = np.asarray(img)
+        print(f"{brawler:8s} {row_name} frame {i + 1} had no letters: copied from frame {donors[0] + 1}")
+    return out
+
+
 # ---------------------------------------------------------------- lining up
 
 def anchor_of(pose: np.ndarray) -> tuple[float, int]:
@@ -176,6 +248,8 @@ def build(brawler: str) -> dict:
     still_h = still.getbbox()[3] - still.getbbox()[1]
     to_still = still_h / float(np.median([p.shape[0] * f for p, f in zip(poses[0], factors[0])]))
     poses = [[scaled(p, f * to_still) for p, f in zip(row, fs)] for row, fs in zip(poses, factors)]
+    if brawler in LETTERED:
+        poses = [restore_letters(row, brawler, name) for row, name in zip(poses, ROWS)]
 
     # --- line up
     placed = []      # [row][frame] = [pose, anchor x, ground y] in the pose's own pixels

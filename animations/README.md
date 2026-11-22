@@ -56,7 +56,6 @@ its light would flip too, and the TNT's letters would read backwards.
 These come from the source sheets. To fix one, generate a new sheet for that brawler, replace
 its file in `source/` and run the script again.
 
-- **TNT:** on the third attack frame the letters "TNT" are missing.
 - **Mr Nut:** the walk has very little movement, and on the third attack frame it is turned
   away, so its face is hidden.
 - **Ghost:** on the second and third walk frames it turns sideways, so it changes shape more
@@ -72,6 +71,10 @@ The script cuts the poses out, brings them to one size, lines them up and shades
 poses are lined up by the body, with the feet on the ground. Attack poses are matched to the
 resting pose where the two look the same, so the body stays put and only the parts that move,
 move.
+
+One pose is repaired along the way. On the TNT sheet, the third attack pose was drawn with a
+second pair of squinting eyes where the letters "TNT" should be, so the box seemed to have
+four eyes. The script removes that pair and copies the letters from the next pose.
 
 To regenerate everything (needs `numpy` and `Pillow`; takes about a minute), run this from the
 repo root:

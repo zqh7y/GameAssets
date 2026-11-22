@@ -103,6 +103,23 @@ def shade_sprite(sprite: Image.Image, strength: float = 1.0, up: int = UPSCALE) 
     return Image.fromarray(res, "RGBA")
 
 
+def letter_labels(rgba: np.ndarray) -> tuple[np.ndarray, list[int]]:
+    """Find the yellow letters on a sprite.
+
+    Returns a label image of everything yellow, and the labels of the letters, left to right.
+    """
+    a = rgba.astype(np.int32)
+    r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
+    yellow = (r > 190) & (g > 140) & (b < 120) & (al > 200) & (r - b > 110)
+    labels, n = label(yellow)
+    found = []
+    for i in range(1, n + 1):
+        xs = np.nonzero(labels == i)[1]
+        if len(xs) > 60:  # ignore specks
+            found.append((xs.mean(), i))
+    return labels, [i for _, i in sorted(found)]
+
+
 def mirror_keep_letters(sprite: Image.Image) -> Image.Image:
     """Mirror a sprite that has the yellow letters "TNT" on it, keeping the text readable.
 
@@ -111,20 +128,18 @@ def mirror_keep_letters(sprite: Image.Image) -> Image.Image:
     """
     m = sprite.convert("RGBA").transpose(Image.FLIP_LEFT_RIGHT)
     a = np.asarray(m).astype(np.int32)
-    r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
-    yellow = (r > 190) & (g > 140) & (b < 120) & (al > 200) & (r - b > 110)
-    labels, n = label(yellow)
-    letters = []
-    for i in range(1, n + 1):
+    labels, ids = letter_labels(a)
+    if not ids:
+        return m             # this pose shows no letters
+    if len(ids) != 3:
+        raise SystemExit(f"expected 3 letters on the sprite, found {len(ids)}")
+    yellow = labels > 0
+    boxes = []
+    for i in ids:
         ys, xs = np.nonzero(labels == i)
-        if len(xs) > 60:  # ignore specks
-            letters.append((xs.mean(), i, xs.min(), xs.max(), ys.min(), ys.max()))
-    letters.sort()
-    if not letters:
-        return m             # this pose shows no letters (they can be hidden in an animation frame)
-    if len(letters) != 3:
-        raise SystemExit(f"expected 3 letters on the sprite, found {len(letters)}")
-    (_, _, ax0, _, ay0, ay1), (_, n_id, nx0, nx1, ny0, ny1), (_, _, cx0, _, cy0, cy1) = letters
+        boxes.append((xs.min(), xs.max(), ys.min(), ys.max()))
+    (ax0, _, ay0, ay1), (nx0, nx1, ny0, ny1), (cx0, _, cy0, cy1) = boxes
+    n_id = ids[1]
     # Slope of the line of text, from the first to the last letter.
     slope = ((cy0 + cy1) - (ay0 + ay1)) / 2 / (cx0 - ax0)
 
