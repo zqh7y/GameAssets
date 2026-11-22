@@ -1,7 +1,7 @@
 # Examples
 
-Previews of how the brawlers look on the cards, in motion and on the map. These are **not game
-assets**.
+Previews of how the brawlers look on the cards, in motion and on the map, and of the enemies.
+These are **not game assets**.
 They show the intended look, so the game can be built to match.
 
 ## Brawler cards
@@ -51,6 +51,32 @@ picture of it:
 
 ![One screen of the forest with three brawlers](map_forest_screen.jpg)
 
+## Enemies
+
+The Beetle Knight from [`enemies/`](../enemies/), at its real size on the forest path: it
+marches at the brawlers, then winds up and slashes with its twig sword.
+
+![The Beetle Knight marching and attacking](enemy_beetle.gif)
+
+## A fight in the forest
+
+[`battle_forest.mp4`](battle_forest.mp4) shows how it all fits together (12 seconds). All seven
+brawlers walk along the forest map, and four Beetle Knights come at them. The map stops while
+they fight:
+
+- the Ghost, the TNT, Mr Nut and Peep stand in front, each hitting the beetle across from it
+  (the TNT blows up, then pops back)
+- the Mage, the Dragon and the Octopus stand behind and shoot over their heads: magic, a
+  fireball and a splash fly to the beetles and burst there
+- the beetles slash back at the brawlers in front
+
+A hit shows as a white flash and a little knock-back, with the damage in numbers; each beetle
+has a health bar. Beaten beetles flash, squash and burst into leaves, and the squad walks on.
+The fight itself (who attacks when, how hard, the shots) is made up for the preview. One
+picture of it:
+
+![All seven brawlers fighting four Beetle Knights](battle_forest.jpg)
+
 ## Size lineup
 
 ![All brawlers at their relative sizes](size_lineup.jpg)
@@ -79,6 +105,18 @@ The map previews (the video needs `ffmpeg`):
 
 ```bash
 python3 scripts/make_map.py
+```
+
+The enemy previews:
+
+```bash
+python3 scripts/make_enemies.py
+```
+
+The fight (needs `ffmpeg` for the video):
+
+```bash
+python3 scripts/make_battle.py
 ```
 
 The size lineup and the shading comparison:

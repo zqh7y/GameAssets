@@ -4,7 +4,7 @@ A sheet gives four drawn poses per animation. Shown one after the other, that is
 pictures a second: too few to look smooth, however well they are lined up. Games get around
 this by moving the whole sprite smoothly while the poses change. It bobs and rocks as it
 walks, squashes and stretches, pulls back and lunges on an attack. This file describes that
-motion for every brawler.
+motion for every brawler, and for the enemies.
 
 A motion is five tracks:
     x, y              how far the sprite moves, in frame pixels (y is negative upwards)
@@ -45,6 +45,8 @@ WALKS = {
     "acorn":   ("waddle", {"lift": 0.025, "stretch": 0.030, "rock": 4.0}),
     "ghost":   ("float",  {"bob": 0.030, "sway": 2.0, "breathe": 0.015}),
     "octopus": ("crawl",  {"pulse": 0.035, "slide": 0.020}),
+    # enemies (see make_enemies.py)
+    "beetle":  ("waddle", {"lift": 0.020, "stretch": 0.025, "rock": 3.0}),
 }
 DEFAULT_WALK = ("waddle", {"lift": 0.018, "stretch": 0.025, "rock": 2.5})
 
@@ -64,6 +66,8 @@ ATTACKS = {
     "acorn":   ("lunge", {"back": 0.030, "forward": 0.07, "lean_back": 4.0, "lean": 5.0, "hop": 0.020}),
     "octopus": ("lunge", {"back": 0.020, "forward": 0.04, "lean_back": 2.0, "lean": 2.0}),
     "tnt":     ("swell", {}),
+    # enemies (see make_enemies.py)
+    "beetle":  ("lunge", {"back": 0.035, "forward": 0.08, "lean_back": 4.0, "lean": 5.0, "hop": 0.015}),
 }
 DEFAULT_ATTACK = ("lunge", {"back": 0.03, "forward": 0.06, "lean_back": 3.0, "lean": 3.0})
 
