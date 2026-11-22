@@ -14,7 +14,7 @@ from collections import deque
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "brawlers" / "source"
@@ -119,13 +119,24 @@ def window_stack(arr: np.ndarray, ys: np.ndarray, xs: np.ndarray, r: int) -> np.
     return np.stack(out, axis=1)
 
 
-def key_green(path: Path) -> np.ndarray:
+def key_green(path: Path, remove_shadows: bool = False) -> np.ndarray:
+    """Cut the art out of a green screen. Returns an RGBA array.
+
+    remove_shadows: also remove shadows that were drawn on the screen (darker patches of
+    the same green, usually under a character's feet).
+    """
     rgb = np.asarray(Image.open(path).convert("RGB")).astype(np.float32)
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
     greenness = g - np.maximum(r, b)
 
-    # Background colour = median of strongly green pixels.
-    bg_global = np.median(rgb[greenness > 180], axis=0)
+    # Background colour = median of the clearly green pixels. On a pure green screen those
+    # have a greenness above 180. A paler or darker screen never gets that high, so there
+    # "clearly green" is judged against the image border instead.
+    clearly_green = greenness > 180
+    if clearly_green.mean() < 0.05:
+        border = np.concatenate([greenness[0], greenness[-1], greenness[:, 0], greenness[:, -1]])
+        clearly_green = greenness > 0.75 * np.median(border)
+    bg_global = np.median(rgb[clearly_green], axis=0)
     bg_green = bg_global[1] - max(bg_global[0], bg_global[2])
 
     # Pure background, the edge band next to it, and solid foreground.
@@ -134,6 +145,13 @@ def key_green(path: Path) -> np.ndarray:
     # Tiny gaps where the screen shows through dark outlines are dim but strongly green
     # (green dominates the pixel), unlike muted green art such as the wizard's staff gem.
     dominance = greenness / np.maximum(g, 1.0)
+    if remove_shadows:
+        # A shadow on the screen is the screen colour, only darker: green dominates it just
+        # as much as it dominates the background. Only open patches count, so the soft edge
+        # of a dark outline (which can look the same, pixel by pixel) is left alone.
+        shadowish = (dominance > 0.88 * bg_green / bg_global[1]) & (greenness > 0.40 * bg_green)
+        screen = Image.fromarray(((bg | shadowish) * 255).astype(np.uint8)).filter(ImageFilter.BoxBlur(2))
+        bg |= shadowish & (np.asarray(screen) > 0.70 * 255)
     gaps = (dominance > 0.5) & (greenness > 25)
     # The band is 2px around the background plus any greenish halo touching it or a gap.
     halo = bg | gaps
