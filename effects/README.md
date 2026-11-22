@@ -19,9 +19,9 @@ Each file above is a whole cluster, as it was drawn. Every single shape of a clu
 saved on its own in [`pieces/`](pieces/), named `<cluster>_<n>.png` with the biggest shape
 first: `spark_1.png` is the star, `spark_2.png` and up are its dots.
 
-The pieces are what a game needs: it can move, spin and fade each one as a particle. The
-cards in [`examples/`](../examples/) use three to five pieces per card, placed around the
-brawlers.
+The pieces are what a game needs: it can move, spin and fade each one as a particle. Nothing
+in this repo uses them at the moment: they were shown on the earlier cards, which were
+replaced by the ones in [`cards/`](../cards/).
 
 ## Source
 
