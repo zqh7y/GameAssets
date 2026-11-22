@@ -3,7 +3,18 @@
 Previews of how the brawlers look on the cards. These are **not game assets**. They show the
 intended look, so the game can be built to match.
 
-## Cards
+## Brawler cards
+
+The new card design: wide and short, one per brawler, from
+[`cards/brawlers/`](../cards/brawlers/). Peep's is done so far.
+
+![Peep's card](card_chick.gif)
+
+The skill text is a placeholder.
+
+## Earlier cards
+
+The first, upright card design, with groups of brawlers on the basic and jackpot cards.
 
 ![Peep, Mage and Ghost on cards](cards_peep_mage_ghost.jpg)
 
@@ -62,4 +73,10 @@ The animation preview comes from a different script:
 
 ```bash
 python3 scripts/extract_animations.py
+```
+
+The brawler card previews come from another one:
+
+```bash
+python3 scripts/make_brawler_cards.py
 ```

@@ -1,0 +1,121 @@
+{
+  "layout": {
+    "card": {
+      "width": 960,
+      "height": 300,
+      "corner_radius": 42
+    },
+    "brawler": {
+      "feet": [
+        150,
+        282
+      ],
+      "height": 318
+    },
+    "name": {
+      "left": 292,
+      "top": 56,
+      "size": 92
+    },
+    "skill": {
+      "left": 295,
+      "top": 168,
+      "size": 33,
+      "line_height": 40,
+      "width": 360
+    },
+    "object": {
+      "center": [
+        838,
+        116
+      ],
+      "height": 272
+    }
+  },
+  "motion": {
+    "loop_ms": 3000,
+    "brawler": {
+      "breathe": 0.03,
+      "breathe_ms": 1500,
+      "rock_deg": 1.5,
+      "rock_ms": 3000
+    },
+    "object": {
+      "bob_px": 8,
+      "bob_ms": 1500,
+      "rock_deg": 5,
+      "rock_ms": 3000
+    },
+    "shine": {
+      "start_ms": 900,
+      "duration_ms": 700,
+      "strength": 0.3
+    },
+    "particles": {
+      "wind_deg": 14,
+      "layers": [
+        {
+          "name": "far",
+          "count": 48,
+          "size": [
+            24,
+            34
+          ],
+          "speed": 24,
+          "sway_px": 4,
+          "spin_deg": 18,
+          "life_ms": 3000,
+          "fade_to_card": 0.5,
+          "blur_px": 1.0
+        },
+        {
+          "name": "mid",
+          "count": 36,
+          "size": [
+            36,
+            50
+          ],
+          "speed": 42,
+          "sway_px": 7,
+          "spin_deg": 28,
+          "life_ms": 3000,
+          "fade_to_card": 0.22,
+          "blur_px": 0.4
+        },
+        {
+          "name": "near",
+          "count": 16,
+          "size": [
+            52,
+            70
+          ],
+          "speed": 64,
+          "sway_px": 10,
+          "spin_deg": 36,
+          "life_ms": 1500,
+          "fade_to_card": 0.0,
+          "blur_px": 0.0,
+          "keep_off_text": true
+        }
+      ],
+      "tumbling": 0.6
+    }
+  },
+  "font": "fonts/LilitaOne-Regular.ttf",
+  "brawlers": {
+    "chick": {
+      "name": "Peep",
+      "skill": "Pecks the closest enemy, super fast.",
+      "card": "chick/card.png",
+      "object": "chick/object.png",
+      "particles": [
+        "chick/particles/1.png",
+        "chick/particles/2.png",
+        "chick/particles/3.png",
+        "chick/particles/4.png",
+        "chick/particles/5.png",
+        "chick/particles/6.png"
+      ]
+    }
+  }
+}
