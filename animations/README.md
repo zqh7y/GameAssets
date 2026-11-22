@@ -170,7 +170,7 @@ One pose is repaired along the way. On the TNT sheet, the third attack pose was 
 second pair of squinting eyes where the letters "TNT" should be, so the box seemed to have
 four eyes. The script removes that pair and copies the letters from the next pose.
 
-The effects are traced rather than cut out, like the shapes in `effects/`: each shape is
+The effects are traced rather than cut out (see `scripts/trace_shapes.py`): each shape is
 enlarged, its outline re-sharpened, and it is filled with its exact flat colour. Two colours
 needed care:
 

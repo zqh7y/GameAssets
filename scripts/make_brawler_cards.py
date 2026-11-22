@@ -6,18 +6,18 @@ it (Peep's feather...), and about 100 small ones that drift across it, as if a b
 blowing through. The brawler stands on the left and pops out over the top of the card; its
 name and skill are written next to it.
 
-Source: cards/brawlers/source/*.jpg, sheets on a green screen. A sheet has one brawler (the
+Source: cards/source/*.jpg, sheets on a green screen. A sheet has one brawler (the
         empty card at the top, one big 3D object below it, small ones next to that) or several
         brawlers in rows (the card on the left, the big object in the middle, small ones on the
         right). The file name lists the brawlers on it, top to bottom: tnt-dragon-wizard.jpg.
 
-Output, per brawler, in cards/brawlers/<brawler>/:
+Output, per brawler, in cards/<brawler>/:
   card.png           the card, 960 x 300 px: shorter than on the sheet, with crisp corners
   object.png         the big 3D object
   particles/<n>.png  the small ones, biggest first (4 to 9 of them, as drawn)
-plus cards/brawlers/cards.json (where everything goes and how it moves, for the game), a still
-of every card in examples/card_<brawler>.png, and a moving preview of three cards stacked like
-on the real screen in examples/cards_screen.gif.
+plus cards/cards.json (where everything goes and how it moves, for the game), a still of every
+card in examples/card_<brawler>.png, and two moving previews: all the cards in
+examples/cards_all.gif, and three stacked like on the real screen in examples/cards_screen.gif.
 
 Requires: numpy, Pillow
 Run from the repo root:  python3 scripts/make_brawler_cards.py
@@ -37,8 +37,8 @@ from extract_brawlers import crop_to_alpha, dilate, key_green, label
 from shade_brawlers import blur
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "cards" / "brawlers" / "source"
-OUT = ROOT / "cards" / "brawlers"
+SRC = ROOT / "cards" / "source"
+OUT = ROOT / "cards"
 EXAMPLES = ROOT / "examples"
 FONT = ROOT / "fonts" / "LilitaOne-Regular.ttf"
 NAMES = {k: v["name"] for k, v in json.loads((ROOT / "brawlers" / "sizes.json").read_text()).items()}
@@ -64,7 +64,9 @@ OBJECT_SIZE = {"wizard": 232, "acorn": 246, "octopus": 216}
 
 # The three cards stacked in the screen preview, top to bottom.
 SCREEN = ["chick", "tnt", "wizard"]
-SCREEN_SCALE = 0.5         # the screen preview is drawn at half size, to keep the file small
+# Every card, top to bottom, in the preview of all of them.
+ALL = ["chick", "tnt", "dragon", "wizard", "ghost", "acorn", "octopus"]
+PREVIEW_SCALE = 0.5        # both are drawn at half size, to keep the files small
 
 # ---------------------------------------------------------------- layout and motion
 # Everything below is in pixels of the card (960 x 300), measured from its top left corner.
@@ -515,27 +517,28 @@ def save_gif(frames: list[Image.Image], path: Path, keep: list[tuple] = ()) -> N
                    duration=round(1000 / FPS), loop=0, disposal=1, optimize=False)
 
 
-def build_screen(frames: dict[str, list[Image.Image]]) -> None:
-    """Three cards stacked like on the real screen. Each runs a second behind the one above,
-    so their shines sweep down the screen one after another."""
-    names = [b for b in SCREEN if b in frames]
+def build_stack(frames: dict[str, list[Image.Image]], names: list[str], path: Path, offset_ms: float) -> None:
+    """Cards stacked on top of each other, as one moving preview. Each card runs `offset_ms`
+    behind the one above, so their shines sweep down one after another.
+
+    `frames` are already at PREVIEW_SCALE.
+    """
+    names = [b for b in names if b in frames]
     if not names:
         return
-    first = frames[names[0]][0]
-    w, h = round(first.width * SCREEN_SCALE), round(first.height * SCREEN_SCALE)
-    count, offset = len(frames[names[0]]), round(FPS)              # one second between the cards
-    small = {b: [f.resize((w, h), Image.LANCZOS) for f in frames[b]] for b in names}
-    screen = []
+    w, h = frames[names[0]][0].size
+    count, offset = len(frames[names[0]]), round(offset_ms * FPS / 1000)
+    pages = []
     for i in range(count):
         page = Image.new("RGB", (w, h * len(names)), BACKGROUND)
         for row, b in enumerate(names):
-            page.paste(small[b][(i + row * offset) % count], (0, row * h))
-        screen.append(page)
-    keep = []
+            page.paste(frames[b][(i + row * offset) % count], (0, row * h))
+        pages.append(page)
+    keep = []                       # make sure every brawler's own colours are in the GIF
     for b in names:
         body = Image.open(ROOT / "brawlers" / "shaded" / f"{b}.png")
         keep += distinct_colours(body.crop(body.getbbox()))
-    save_gif(screen, EXAMPLES / "cards_screen.gif", keep)
+    save_gif(pages, path, keep)
 
 
 # ---------------------------------------------------------------- main
@@ -547,9 +550,9 @@ def main() -> None:
 
     sheets = sorted(SRC.glob("*.jpg"))
     if not sheets:
-        raise SystemExit("no sheets in cards/brawlers/source/")
+        raise SystemExit("no sheets in cards/source/")
     meta = {"layout": LAYOUT, "motion": MOTION, "font": "fonts/LilitaOne-Regular.ttf", "brawlers": {}}
-    screen = {}
+    previews = {}                   # every card's frames, at PREVIEW_SCALE
     for sheet in sheets:
         names = sheet.stem.split("-")
         for brawler, (card_part, big, small) in zip(names, cut_sheet(sheet, len(names))):
@@ -572,13 +575,14 @@ def main() -> None:
                 "particle_seed": SEEDS.get(brawler, 7),
             }
             frames = build_preview(brawler, card, big, small, args.gifs)
-            if brawler in SCREEN:
-                screen[brawler] = frames
+            size = (round(frames[0].width * PREVIEW_SCALE), round(frames[0].height * PREVIEW_SCALE))
+            previews[brawler] = [f.resize(size, Image.LANCZOS) for f in frames]
             print(f"{brawler:8s} card {card.size}, object {big.size}, {len(small)} particles")
     order = [b for b in NAMES if b in meta["brawlers"]]
     meta["brawlers"] = {b: meta["brawlers"][b] for b in order}
     (OUT / "cards.json").write_text(json.dumps(meta, indent=2) + "\n")
-    build_screen(screen)
+    build_stack(previews, SCREEN, EXAMPLES / "cards_screen.gif", 1000)
+    build_stack(previews, ALL, EXAMPLES / "cards_all.gif", MOTION["loop_ms"] / len(ALL))
 
 
 if __name__ == "__main__":

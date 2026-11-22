@@ -10,7 +10,7 @@ Output: animations/<brawler>/attack_effect.png and walk_effect.png, the steps si
         drawn at the same scale as the brawler's frames, plus what a game needs to place and
         time them (returned to extract_animations.py, which writes it into animations.json).
 
-The shapes are traced like the card effects (see extract_effects.py), so they stay crisp and
+The shapes are traced (see trace_shapes.py), so they stay crisp and
 flat. Every step of an effect gets the same cell size, with the effect's anchor point in the
 same place.
 
@@ -24,7 +24,7 @@ import numpy as np
 from PIL import Image
 
 import brawler_motion as motion
-import extract_effects as fx
+import trace_shapes
 from extract_brawlers import dilate, label
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -90,17 +90,17 @@ def cut_sheet(sheet: Path, purest: bool = False) -> dict[str, list[np.ndarray]]:
     """Trace a sheet. For every brawler: its steps, as RGBA images the size of a sheet column.
 
     A column can have fewer than 4 steps: a row with nothing in it is left out.
-    purest: see extract_effects.flat_colours().
+    purest: see trace_shapes.flat_colours().
     """
     rgb = np.asarray(Image.open(sheet).convert("RGB")).astype(np.float32)
     h, w = rgb.shape[:2]
     bg = np.median(np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]]), axis=0)
-    fg = np.sqrt(((rgb - bg) ** 2).sum(axis=2)) > fx.FG_DISTANCE
+    fg = np.sqrt(((rgb - bg) ** 2).sum(axis=2)) > trace_shapes.FG_DISTANCE
 
     out = {}
     for c, brawler in enumerate(COLUMNS):
         x0, x1 = round(c * w / len(COLUMNS)), round((c + 1) * w / len(COLUMNS))
-        rgba = fx.trace(rgb[:, x0:x1], fg[:, x0:x1], bg, purest)   # one set of colours for the whole column
+        rgba = trace_shapes.trace(rgb[:, x0:x1], fg[:, x0:x1], bg, purest)   # one set of colours for the whole column
         # Every shape belongs to the step whose row its middle is in.
         labels, n = label(rgba[..., 3] > 127)
         rows = [np.zeros(labels.shape, dtype=bool) for _ in range(ROWS)]
