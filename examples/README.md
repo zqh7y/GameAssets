@@ -43,12 +43,13 @@ its left edge.
 
 ![The whole forest map](map_forest.jpg)
 
-One screen of it, with Peep, the Mage and the TNT at their real sizes:
+[`map_forest.mp4`](map_forest.mp4) shows Peep, the Mage and the TNT walking once round the loop,
+at their real sizes, with the map alive: trees and plants swaying in the wind, leaves and petals
+falling, butterflies, a bird flying over, and flowers and grass that bend and pop petals or
+leaves as the brawlers walk through them (35 seconds; the video loops seamlessly too). One
+picture of it:
 
 ![One screen of the forest with three brawlers](map_forest_screen.jpg)
-
-[`map_forest.mp4`](map_forest.mp4) shows them walking once round the loop (35 seconds; the
-video loops seamlessly too).
 
 ## Size lineup
 
