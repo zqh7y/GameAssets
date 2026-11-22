@@ -58,8 +58,13 @@ def find_clusters(fg: np.ndarray) -> list[tuple[int, int]]:
     return [(int(a), int(b)) for a, b in runs]
 
 
-def flat_colours(pixels: np.ndarray, bg: np.ndarray) -> np.ndarray:
-    """The few flat colours a set of pixels is painted in."""
+def flat_colours(pixels: np.ndarray, bg: np.ndarray, purest: bool = False) -> np.ndarray:
+    """The few flat colours a set of pixels is painted in.
+
+    purest: measure each colour from its purest pixels only. Needed when small shapes have a
+    colour of their own (pebbles in a puff of dust): most of a small shape is soft edge, which
+    is blended with the screen, so its average is off toward green.
+    """
     q = Image.fromarray(pixels.astype(np.uint8).reshape(-1, 1, 3)).quantize(6, method=Image.MEDIANCUT)
     pal = np.array(q.getpalette()[:18], dtype=np.float32).reshape(6, 3)
     counts = np.bincount(np.asarray(q).ravel(), minlength=6)
@@ -100,6 +105,14 @@ def flat_colours(pixels: np.ndarray, bg: np.ndarray) -> np.ndarray:
         else:
             joined.append([colour.copy(), count])
     colours = np.array([g[0] for g in joined], dtype=np.float32)
+    if purest:
+        # The purest pixels of a colour are the ones least like the screen.
+        nearest = ((pixels[:, None, :] - colours[None]) ** 2).sum(-1).argmin(axis=1)
+        for k in range(len(colours)):
+            own = pixels[nearest == k]
+            if len(own):
+                far = np.sqrt(((own - bg) ** 2).sum(axis=1))
+                colours[k] = np.median(own[far >= np.percentile(far, 70)], axis=0)
     # The art has no green in it, so a colour with more green than red or blue has picked
     # that up from the screen. Thin shapes do: take the extra green out.
     colours[:, 1] = np.minimum(colours[:, 1], np.maximum(colours[:, 0], colours[:, 2]))
@@ -112,12 +125,15 @@ def resize(arr: np.ndarray, scale: int) -> np.ndarray:
     return np.asarray(img.resize((arr.shape[1] * scale, arr.shape[0] * scale), Image.BICUBIC))
 
 
-def trace(rgb: np.ndarray, fg: np.ndarray, bg: np.ndarray) -> np.ndarray:
-    """Trace the flat shapes in `rgb` and return them as an RGBA image, SCALE times larger."""
+def trace(rgb: np.ndarray, fg: np.ndarray, bg: np.ndarray, purest: bool = False) -> np.ndarray:
+    """Trace the flat shapes in `rgb` and return them as an RGBA image, SCALE times larger.
+
+    purest: see flat_colours().
+    """
     core = erode(fg)                     # pixels inside a shape, away from its soft edge
     deep = erode(core)
     sample = deep if deep.sum() >= 60 else core if core.sum() >= 30 else fg
-    palette = flat_colours(rgb[sample], bg)
+    palette = flat_colours(rgb[sample], bg, purest)
     d = palette - bg                                                     # (K,3)
 
     # Every pixel is a blend of one flat colour F and the background B: P = a*F + (1-a)*B.
