@@ -234,6 +234,26 @@ def key_green(path: Path | np.ndarray, remove_shadows: bool = False) -> np.ndarr
     return np.clip(out + 0.5, 0, 255).astype(np.uint8)
 
 
+def key_magenta(path: Path, drop_purple: bool = True) -> np.ndarray:
+    """Cut the art out of a magenta screen. Returns an RGBA array.
+
+    Magenta is the opposite of green: in the sheet's negative the screen is green, so the
+    negative is keyed like a green screen and the colours are turned back.
+
+    drop_purple: also remove darker patches of the screen (the shade between a fern's leaves,
+    for instance), which are otherwise kept as purple. Only for art with no purple in it: on a
+    character with purple-grey skin it would punch holes.
+    """
+    rgb = np.asarray(Image.open(path).convert("RGB")).astype(np.float32)
+    rgba = key_green(255.0 - rgb)
+    rgba[..., :3] = 255 - rgba[..., :3]
+    if drop_purple:
+        c = rgba[..., :3].astype(np.float32)
+        purple = np.minimum(c[..., 0], c[..., 2]) - c[..., 1]
+        rgba[..., 3] = np.where((purple > 20) & (purple > 0.3 * c.max(-1)), 0, rgba[..., 3])
+    return rgba
+
+
 def split_sheet(rgba: np.ndarray, names: list[str]) -> dict[str, Image.Image]:
     solid = rgba[..., 3] >= 128
     # Join pieces of the same character (e.g. a staff held next to the body).

@@ -1,7 +1,7 @@
 # Examples
 
-Previews of how the brawlers look on the cards, in motion and on the map. These are **not game
-assets**.
+Previews of how the brawlers look on the cards, in motion and on the map, and of the enemies.
+These are **not game assets**.
 They show the intended look, so the game can be built to match.
 
 ## Brawler cards
@@ -51,6 +51,13 @@ picture of it:
 
 ![One screen of the forest with three brawlers](map_forest_screen.jpg)
 
+## Enemies
+
+The Beetle Knight from [`enemies/`](../enemies/), at its real size on the forest path: it
+marches at the brawlers, then winds up and slashes with its twig sword.
+
+![The Beetle Knight marching and attacking](enemy_beetle.gif)
+
 ## Size lineup
 
 ![All brawlers at their relative sizes](size_lineup.jpg)
@@ -79,6 +86,12 @@ The map previews (the video needs `ffmpeg`):
 
 ```bash
 python3 scripts/make_map.py
+```
+
+The enemy previews:
+
+```bash
+python3 scripts/make_enemies.py
 ```
 
 The size lineup and the shading comparison:

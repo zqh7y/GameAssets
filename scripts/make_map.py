@@ -35,7 +35,7 @@ from PIL import Image, ImageDraw, ImageFilter
 import brawler_motion
 import map_motion
 from extract_animations import posed, resized
-from extract_brawlers import crop_to_alpha, dilate, key_green, label
+from extract_brawlers import crop_to_alpha, dilate, key_magenta, label
 
 ROOT = Path(__file__).resolve().parent.parent
 MAPS = ROOT / "maps"
@@ -275,23 +275,6 @@ def even_light(tile: np.ndarray, rows: list[int], strength: float = 0.75) -> np.
 
 
 # ---------------------------------------------------------------- cutting out
-
-def key_magenta(path: Path) -> np.ndarray:
-    """Cut the art out of a magenta screen. Returns an RGBA array.
-
-    Magenta is the opposite of green: in the sheet's negative the screen is green, so the
-    negative is keyed like a green screen and the colours are turned back.
-    """
-    rgb = np.asarray(Image.open(path).convert("RGB")).astype(np.float32)
-    rgba = key_green(255.0 - rgb)
-    rgba[..., :3] = 255 - rgba[..., :3]
-    # Darker patches of the screen (the shade between a fern's leaves, for instance) are kept
-    # as purple. Nothing on the sheet is purple, so remove them.
-    c = rgba[..., :3].astype(np.float32)
-    purple = np.minimum(c[..., 0], c[..., 2]) - c[..., 1]
-    rgba[..., 3] = np.where((purple > 20) & (purple > 0.3 * c.max(-1)), 0, rgba[..., 3])
-    return rgba
-
 
 def pieces(rgba: np.ndarray, join: int, smallest: int, row_gap: int) -> list[Image.Image]:
     """The separate things on a sheet, in reading order.
