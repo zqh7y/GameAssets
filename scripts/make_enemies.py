@@ -14,8 +14,11 @@ Output, in enemies/<enemy>/, everything facing left, toward the brawlers:
 plus enemies/enemies.json (the same fields as animations/animations.json) and a moving preview
 in examples/enemy_<enemy>.gif.
 
-The sheet is drawn facing right, like the brawlers' sheets, so it is lined up and timed like
-theirs (see extract_animations.py and brawler_motion.py) and only turned around at the end.
+Gemini draws the enemy facing left, toward the brawlers, but turns it to the right whenever
+it draws a sword swing. So the attack is made from the enemy's ready pose, with only its weapon
+moving (see `swing` in ENEMIES). The brawlers' tools (lining up, timing, placing the effect,
+see extract_animations.py and brawler_motion.py) work facing right, so the poses are turned
+around for them and back again at the end.
 
 Requires: numpy, Pillow
 Run from the repo root:  python3 scripts/make_enemies.py
@@ -45,19 +48,19 @@ ENEMIES = {
         "name": "Beetle Knight",
         "scale": 0.8,          # its size next to the brawlers, as in brawlers/sizes.json (the Mage is 1)
         "height": 260,         # px of its still sprite, like the brawlers' flat sprites
-        # The poses of the attack, from the sheet's bottom row. Gemini never drew the strike
-        # itself (the sword stays pulled back), so the strike is made from the ready pose: the
-        # sword and the hand holding it (what is inside the box `take`, without the bit of stick
-        # below row `below`) are taken off and put back in front of the body: the hand, at
-        # `hand`, goes to `to`, and the sword is turned by `turn` degrees and drawn `grow` times
-        # as long, so it swings down past the shield at whoever is in front. All in px of the
-        # pose on the sheet, from its top left corner, facing right as drawn.
-        "attack": [0, 1, "strike", 3],
-        "strike": {"pose": 0, "take": (40, 150), "below": 126, "hand": (25, 122), "to": (128, 112),
-                   "turn": -120, "grow": 1.3},
+        # The poses of the attack. Gemini turned the beetle to face right in the wind-up and
+        # never drew the strike, so both are made from the ready pose (the first pose of the
+        # sheet's bottom row), with only the sword moving: the sword and the hand holding it
+        # (everything left of `take`, without the end of the stick below row `below`) are
+        # turned around the middle of the hand (`hand`) by `turn` degrees, counter-clockwise,
+        # the sword drawn `grow` times as long. Back over its shoulder for the wind-up, down at
+        # the brawlers for the strike. In px of the pose on the sheet, from its top left corner.
+        "attack": [0, "windup", "strike", 3],
+        "swing": {"pose": 0, "take": 38, "below": 128, "hand": (24, 116),
+                  "windup": {"turn": -35}, "strike": {"turn": 105, "grow": 1.2}},
         # The slash: where its middle goes, as parts of the frame's width and height on the
-        # striking pose (facing right, as drawn), its longest side at its biggest (px of the
-        # frame), and how long before the hit lands it starts.
+        # striking pose (turned to face right, see above), its longest side at its biggest (px
+        # of the frame), and how long before the hit lands it starts.
         "slash": {"grows": "out", "point": (0.80, 0.50), "size": 230, "lead_ms": 30},
     },
 }
@@ -94,24 +97,23 @@ def cut_poses(sheet: Path) -> list[list[np.ndarray]]:
     return poses
 
 
-def strike(pose: np.ndarray, spec: dict) -> np.ndarray:
-    """The ready pose with its sword swung forward, in front of the body (see ENEMIES)."""
+def swing(pose: np.ndarray, swing: dict, move: dict) -> np.ndarray:
+    """The ready pose with its sword turned around the hand that holds it (see ENEMIES)."""
     h, w = pose.shape[:2]
     ys, xs = np.mgrid[0:h, 0:w]
-    off = (xs < spec["take"][0]) & (ys < spec["take"][1])     # the sword, the hand and the end of the arm
-    sword, body = pose.copy(), pose.copy()
-    sword[..., 3] = np.where(off & (ys < spec["below"]), sword[..., 3], 0)
-    body[..., 3] = np.where(off, 0, body[..., 3])
+    left = xs < swing["take"]
+    piece, body = pose.copy(), pose.copy()
+    piece[..., 3] = np.where(left & (ys <= swing["below"]), piece[..., 3], 0)
+    body[..., 3] = np.where(left, 0, body[..., 3])
     m = max(h, w)                                              # room for the sword to swing out
     canvas = Image.new("RGBA", (w + 2 * m, h + 2 * m), (0, 0, 0, 0))
     canvas.alpha_composite(Image.fromarray(body, "RGBA"), (m, m))
-    k = spec["grow"]
-    piece = Image.fromarray(sword, "RGBA").crop((0, 0, spec["take"][0], spec["below"])).convert("RGBa")
-    piece = piece.resize((round(piece.width * k), round(piece.height * k)), Image.LANCZOS)
-    (hx, hy), (tx, ty) = spec["hand"], spec["to"]
+    k = move.get("grow", 1.0)
+    hx, hy = swing["hand"]
+    sword = Image.fromarray(piece, "RGBA").convert("RGBa").resize((round(w * k), round(h * k)), Image.LANCZOS)
     layer = Image.new("RGBa", canvas.size, (0, 0, 0, 0))
-    layer.paste(piece, (round(m + tx - hx * k), round(m + ty - hy * k)))
-    layer = layer.rotate(spec["turn"], resample=Image.BICUBIC, center=(m + tx, m + ty))
+    layer.paste(sword, (round(m + hx - hx * k), round(m + hy - hy * k)))
+    layer = layer.rotate(move["turn"], resample=Image.BICUBIC, center=(m + hx, m + hy))
     canvas.alpha_composite(layer.convert("RGBA"))             # the sword in front of the body
     return np.asarray(canvas.crop(canvas.getbbox()))
 
@@ -159,18 +161,20 @@ def build(enemy: str) -> dict:
     folder = OUT / enemy
     folder.mkdir(parents=True, exist_ok=True)
 
-    # --- the still sprite, at the brawlers' size, facing left
+    # --- the still sprite, at the brawlers' size, facing left as drawn
     still = Image.fromarray(key_magenta(SRC / f"{enemy}.png", drop_purple=False), "RGBA")
     still = crop_to_alpha(np.asarray(still))
     k = spec["height"] / still.height
     still = resized(still, (round(still.width * k), round(still.height * k)))
-    shade(flipped(still)).save(folder / "still.png", optimize=True)
+    shade(still).save(folder / "still.png", optimize=True)
 
-    # --- the poses
+    # --- the poses, turned to face right for the brawlers' tools
     sheet = cut_poses(SRC / f"{enemy}_sheet.png")
-    walk = sheet[0]
-    attack = [strike(sheet[1][spec["strike"]["pose"]], spec["strike"]) if p == "strike" else sheet[1][p]
+    ready = sheet[1][spec["swing"]["pose"]]
+    attack = [sheet[1][p] if isinstance(p, int) else swing(ready, spec["swing"], spec["swing"][p])
               for p in spec["attack"]]
+    walk = [np.ascontiguousarray(p[:, ::-1]) for p in sheet[0]]
+    attack = [np.ascontiguousarray(p[:, ::-1]) for p in attack]
     poses = [walk, attack]
 
     # one size: walk poses made equal unless they really differ in shape, attack poses as
@@ -203,7 +207,7 @@ def build(enemy: str) -> dict:
     cells = {name: [cell(*f) for f in row] for name, row in zip(ROWS, placed)}
     frames = {}
     for name, row in cells.items():
-        frames[name] = [shade(flipped(f)) for f in row]                  # facing left: turned, then shaded
+        frames[name] = [shade(flipped(f)) for f in row]                  # facing left again: turned, then shaded
         strip(frames[name]).save(folder / f"{name}.png", optimize=True)
         strip([shade(f) for f in row]).save(folder / f"{name}_mirrored.png", optimize=True)
 

@@ -40,15 +40,15 @@ The originals are in [`source/`](source/):
 - `beetle_sheet.png`: 8 poses, the walk on the top row and the attack below
 - `beetle_slash.png`: the slash of its sword, in 4 steps
 
-Gemini drew the sheet facing right, like the brawlers' sheets, so it is cut out, lined up,
-timed and shaded like theirs (see [`scripts/extract_animations.py`](../scripts/extract_animations.py)),
-and only turned around at the end.
+Gemini drew the walk and the ready pose facing left, toward the brawlers, as asked. But
+whenever it drew the sword swinging, it turned the beetle to face right, and it never drew the
+strike itself. So the attack is made from the ready pose, with only the sword moving: it goes
+back over the beetle's shoulder for the wind-up, then down at the brawlers for the strike. The
+beetle faces left the whole time. The sheet's second and third attack poses are not used.
 
-Gemini never drew the strike itself: however it was asked, the sword stayed pulled back. So
-the strike is made from the ready pose: the sword and the hand that holds it are taken off and
-put back in front of the body, swung down past the shield at the brawlers. The third pose of
-the sheet's bottom row is not used. The slash appears in front of the beetle as the hit lands,
-like the brawlers' attack effects.
+The poses are then lined up, timed and shaded like the brawlers' (see
+[`scripts/extract_animations.py`](../scripts/extract_animations.py)). The slash appears in
+front of the beetle as the hit lands, like the brawlers' attack effects.
 
 Its motion is with the brawlers' in [`scripts/brawler_motion.py`](../scripts/brawler_motion.py):
 a waddle for the walk, and for the attack a lunge with a little hop as it winds up.
