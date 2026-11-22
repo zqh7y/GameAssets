@@ -1,6 +1,7 @@
 # Examples
 
-Previews of how the brawlers look on the cards and in motion. These are **not game assets**.
+Previews of how the brawlers look on the cards, in motion and on the map. These are **not game
+assets**.
 They show the intended look, so the game can be built to match.
 
 ## Brawler cards
@@ -35,6 +36,21 @@ Every brawler is drawn at the same size here, so the motion is easy to judge.
 
 ![All brawlers walking and attacking](animations.gif)
 
+## The forest map
+
+The whole map from [`maps/`](../maps/), at a third of its size. It loops: its right edge joins
+its left edge.
+
+![The whole forest map](map_forest.jpg)
+
+[`map_forest.mp4`](map_forest.mp4) shows Peep, the Mage and the TNT walking once round the loop,
+at their real sizes, with the map alive: trees and plants swaying in the wind, leaves and petals
+falling, butterflies, a bird flying over, and flowers and grass that bend and pop petals or
+leaves as the brawlers walk through them (35 seconds; the video loops seamlessly too). One
+picture of it:
+
+![One screen of the forest with three brawlers](map_forest_screen.jpg)
+
 ## Size lineup
 
 ![All brawlers at their relative sizes](size_lineup.jpg)
@@ -57,6 +73,12 @@ The animation preview:
 
 ```bash
 python3 scripts/extract_animations.py
+```
+
+The map previews (the video needs `ffmpeg`):
+
+```bash
+python3 scripts/make_map.py
 ```
 
 The size lineup and the shading comparison:
