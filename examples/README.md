@@ -33,8 +33,9 @@ The label font is a placeholder (whatever bold font the script finds), not the g
 
 ## Animations
 
-The walk (top) and attack (bottom) of every brawler, from [`animations/`](../animations/).
-Every brawler is drawn at the same size here, so the motion is easy to judge.
+The walk (top) and attack (bottom) of every brawler, from [`animations/`](../animations/):
+the 4 drawn poses of each animation, played together with its smooth motion at 25 pictures a
+second. Every brawler is drawn at the same size here, so the motion is easy to judge.
 
 ![All brawlers walking and attacking](animations.gif)
 

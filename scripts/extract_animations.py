@@ -7,8 +7,8 @@ Source (in animations/source/):
 Output, per brawler, in animations/<brawler>/:
   - walk.png, attack.png                    4 frames side by side, shaded like the still sprites
   - walk_mirrored.png, attack_mirrored.png  the same, facing the other way
-plus animations/animations.json (frame size, anchor point and timing for every brawler)
-and a moving preview of all brawlers in examples/animations.gif.
+plus animations/animations.json (frame size, anchor point, timing and smooth motion for
+every brawler) and a moving preview of all brawlers in examples/animations.gif.
 
 What happens to a sheet:
   1. The 8 poses are cut out of the green screen. Shadows drawn under the feet are removed.
@@ -25,16 +25,23 @@ What happens to a sheet:
   4. Each frame gets the same 3D shading as the still sprites. Mirrored frames are mirrored
      first and shaded afterwards, so the light stays top-left.
 
+Four drawn poses are too few to look smooth on their own, so every animation also gets a
+smooth motion to play on top of them (see brawler_motion.py). It is saved in animations.json
+and shown in the preview.
+
 Requires: numpy, Pillow
 Run from the repo root:  python3 scripts/extract_animations.py
 """
 
 import json
+import math
+import re
 from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+import brawler_motion as motion
 from extract_brawlers import dilate, key_green, label
 from shade_brawlers import LETTERED, letter_labels, mirror_sprite, shade_sprite
 
@@ -49,11 +56,6 @@ FRAMES = 4                     # poses per row
 PAD = 6                        # transparent pixels around the poses in a cell
 ORDER = ["chick", "tnt", "dragon", "wizard", "ghost", "acorn", "octopus"]   # order in the preview
 
-# How long each frame is shown, in milliseconds.
-TIMING = {
-    "walk": {"loop": True, "frame_ms": [130, 130, 130, 130]},
-    "attack": {"loop": False, "frame_ms": [130, 70, 150, 130]},   # wind up, strike, hold, recover
-}
 # Brawlers that float instead of walking: their poses keep the heights they were drawn at.
 FLOATING = {"ghost"}
 
@@ -310,9 +312,8 @@ def build(brawler: str) -> dict:
             "frame_height": cell_h,
             "anchor": list(anchor),
             "animations": {
-                name: {"file": f"{name}.png", "mirrored_file": f"{name}_mirrored.png",
-                       "frames": FRAMES, **TIMING[name]}
-                for name in ROWS
+                name: {"file": f"{name}.png", "mirrored_file": f"{name}_mirrored.png", "frames": FRAMES, **timing}
+                for name, timing in motion.animations(brawler, cell_h).items()
             },
         },
     }
@@ -329,88 +330,110 @@ def load_font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default(size)
 
 
-def preview(built: dict[str, dict]) -> None:
-    """One GIF with every brawler: the walk looping on the top row, the attack below.
+def posed(frame: Image.Image, anchor: tuple, move: tuple, size: tuple, at: tuple) -> Image.Image:
+    """`frame` on a clear canvas of `size` with its anchor at `at`: stretched, turned, then moved."""
+    x, y, rotate, wide, tall = move
+    c, s = math.cos(math.radians(rotate)), math.sin(math.radians(rotate))
+    ox, oy = at[0] + x, at[1] + y
+    # PIL asks for the way back: where a point of the canvas comes from in the frame.
+    a, b, d, e = c / wide, s / wide, -s / tall, c / tall
+    back = (a, b, anchor[0] - a * ox - b * oy, d, e, anchor[1] - d * ox - e * oy)
+    return frame.convert("RGBa").transform(size, Image.AFFINE, back, resample=Image.BICUBIC).convert("RGBA")
 
-    Every brawler is drawn at the same size here, so the motion is easy to judge. Their real
-    sizes relative to each other are in brawlers/sizes.json.
+
+def put(img: Image.Image, sprite: Image.Image, x: int, y: int) -> None:
+    """Draw `sprite` on `img` at a position that may be partly outside it."""
+    left, top = max(0, -x), max(0, -y)
+    if left or top:
+        sprite = sprite.crop((left, top, sprite.width, sprite.height))
+    img.alpha_composite(sprite, (max(0, x), max(0, y)))
+
+
+def preview(built: dict[str, dict]) -> None:
+    """One GIF with every brawler: walking on the top row, attacking below.
+
+    It plays the drawn poses together with the smooth motion from animations.json, at 25
+    pictures a second, the way a game would (a game can go faster still). Every brawler is
+    drawn at the same size here, so the motion is easy to judge. Their real sizes relative to
+    each other are in brawlers/sizes.json.
     """
     order = [b for b in ORDER if b in built] + sorted(b for b in built if b not in ORDER)
-    tile, gutter, name_h, pad = 200, 104, 46, 12
+    big = 2                                      # drawn at twice the size and scaled down, for clean edges
+    tile, gutter, name_h, pad = 170, 96, 42, 10
     width = gutter + tile * len(order) + pad
     height = pad + tile * 2 + name_h
+    step_ms, total_ms = 40, 2 * motion.WALK_MS   # 25 pictures a second, two walk cycles
+    attack_from = 120                            # the attack starts a moment after the loop does
     sand, brown = (236, 214, 178, 255), (92, 52, 28, 255)
-    font = load_font(24)
+    font = load_font(22 * big)
+    canvas = (round(tile * big * 1.7),) * 2      # room for a lunge beyond the tile
+    at = (canvas[0] / 2, canvas[1] * 0.80)       # where the anchor sits on that canvas
+    still = (0.0, 0.0, 0.0, 1.0, 1.0)
 
     # Scale every brawler to fit a tile, and measure its ground shadow.
     small = {}
     for b in order:
         frames, meta = built[b]["frames"], built[b]["meta"]
         fw, fh = meta["frame_width"], meta["frame_height"]
-        k = min((tile - 12) / fw, (tile - 30) / fh)
+        k = big * min((tile - 24) / fw, (tile - 40) / fh)
         size = (round(fw * k), round(fh * k))
         box = frames["walk"][0].getbbox()
         small[b] = {
+            "k": k,
             "frames": {n: [resized(f, size) for f in fs] for n, fs in frames.items()},
             "anchor": (meta["anchor"][0] * k, meta["anchor"][1] * k),
             "shadow": (box[2] - box[0]) * k * 0.72,
+            "height": fh * k,
         }
 
-    def scene(walk_frame: int, attack_frame: int) -> Image.Image:
-        img = Image.new("RGBA", (width, height), sand)
+    def scene(ms: int) -> Image.Image:
+        img = Image.new("RGBA", (width * big, height * big), sand)
         shadows = Image.new("RGBA", img.size, (0, 0, 0, 0))
         ds = ImageDraw.Draw(shadows)
-        spots = []
+        sprites = []
         for col, b in enumerate(order):
-            for row, (name, index) in enumerate((("walk", walk_frame), ("attack", attack_frame))):
-                cx = gutter + tile * col + tile / 2
-                ground = pad + tile * (row + 1) - 16
-                sw = small[b]["shadow"]
-                ds.ellipse((cx - sw / 2, ground - sw * 0.13, cx + sw / 2, ground + sw * 0.09), fill=(96, 52, 12, 115))
-                ax, ay = small[b]["anchor"]
-                spots.append((small[b]["frames"][name][index], round(cx - ax), round(ground - ay)))
-        img.alpha_composite(shadows.filter(ImageFilter.GaussianBlur(4)))
-        for frame, x, y in spots:
-            img.alpha_composite(frame, (x, y))
+            look, anims = small[b], built[b]["meta"]["animations"]
+            for row, name in enumerate(ROWS):
+                anim, t = anims[name], ms if name == "walk" else ms - attack_from
+                if name == "walk" or 0 <= t < anim["duration_ms"]:
+                    frame, move = look["frames"][name][motion.frame_at(anim, t)], motion.motion_at(anim, t)
+                elif anim["returns_to_rest"]:
+                    frame, move = look["frames"]["attack"][-1], still      # resting between attacks
+                else:
+                    frame, move = look["frames"]["walk"][-1], still        # the TNT starts over
+                x, y, rotate, wide, tall = move
+                x, y = x * look["k"], y * look["k"]
+                cx = (gutter + tile * col + tile / 2) * big
+                ground = (pad + tile * (row + 1) - 18) * big
+                sw = look["shadow"] * wide * (1 + 3 * y / look["height"])   # smaller while off the ground
+                ds.ellipse((cx + x - sw / 2, ground - sw * 0.13, cx + x + sw / 2, ground + sw * 0.09),
+                           fill=(96, 52, 12, 115))
+                sprite = posed(frame, look["anchor"], (x, y, rotate, wide, tall), canvas, at)
+                sprites.append((sprite, round(cx - at[0]), round(ground - at[1])))
+        img.alpha_composite(shadows.filter(ImageFilter.GaussianBlur(4 * big)))
+        for sprite, x, y in sprites:
+            put(img, sprite, x, y)
         d = ImageDraw.Draw(img)
         for row, title in enumerate(("Walk", "Attack")):
-            d.text((gutter / 2 + 4, pad + tile * row + tile / 2), title, font=font, fill=brown, anchor="mm")
+            d.text(((gutter / 2 + 4) * big, (pad + tile * row + tile / 2) * big), title, font=font, fill=brown, anchor="mm")
         for col, b in enumerate(order):
-            d.text((gutter + tile * col + tile / 2, height - name_h / 2 - 4), built[b]["meta"]["name"],
-                   font=font, fill=brown, anchor="mm")
-        return img
+            d.text(((gutter + tile * col + tile / 2) * big, (height - name_h / 2 - 3) * big),
+                   built[b]["meta"]["name"], font=font, fill=brown, anchor="mm")
+        return img.resize((width, height), Image.LANCZOS)
 
-    # Timeline: the walk loops; the attack plays once, rests on its last pose, then repeats.
-    walk_ms, attack_ms = TIMING["walk"]["frame_ms"], TIMING["attack"]["frame_ms"]
-    total = 2 * sum(walk_ms)
-
-    def frame_at(durations: list[int], t: int) -> int:
-        for i, d in enumerate(durations):
-            if t < d:
-                return i
-            t -= d
-        return len(durations) - 1
-
-    cuts = {0, total}
-    for durations, repeat in ((walk_ms, True), (attack_ms, False)):
-        t = 0
-        while t < total:
-            for d in durations:
-                t += d
-                cuts.add(min(t, total))
-            if not repeat:
-                break
-    cuts = sorted(cuts)
-
-    images, durations = [], []
-    for start, end in zip(cuts, cuts[1:]):
-        img = scene(frame_at(walk_ms, start % sum(walk_ms)), frame_at(attack_ms, start))
-        images.append(img.convert("RGB").quantize(colors=255, method=Image.MEDIANCUT, dither=Image.Dither.NONE))
-        durations.append(end - start)
+    images = [scene(ms).convert("RGB").quantize(colors=255, method=Image.MEDIANCUT, dither=Image.Dither.NONE)
+              for ms in range(0, total_ms, step_ms)]
     EXAMPLES.mkdir(exist_ok=True)
     images[0].save(EXAMPLES / "animations.gif", save_all=True, append_images=images[1:],
-                   duration=durations, loop=0, disposal=1, optimize=False)
-    print(f"preview  {width} x {height}, {len(images)} frames")
+                   duration=step_ms, loop=0, disposal=1, optimize=False)
+    print(f"preview  {width} x {height}, {len(images)} pictures, {1000 // step_ms} a second")
+
+
+def as_json(data: dict) -> str:
+    """JSON with every list of numbers on one line."""
+    text = json.dumps(data, indent=2)
+    return re.sub(r"\[\s+(-?[\d.]+(?:,\s+-?[\d.]+)*)\s+\]",
+                  lambda m: "[" + re.sub(r"\s+", " ", m.group(1)) + "]", text) + "\n"
 
 
 def main() -> None:
@@ -418,7 +441,7 @@ def main() -> None:
     if not sheets:
         raise SystemExit("no sheets in animations/source/")
     built = {s.stem: build(s.stem) for s in sheets}
-    (OUT / "animations.json").write_text(json.dumps({b: v["meta"] for b, v in built.items()}, indent=2) + "\n")
+    (OUT / "animations.json").write_text(as_json({b: v["meta"] for b, v in built.items()}))
     preview(built)
 
 

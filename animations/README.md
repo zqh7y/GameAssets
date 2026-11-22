@@ -1,15 +1,24 @@
 # Animations
 
-Walk and attack animations for the 7 brawlers, 4 frames each.
+Walk and attack animations for the 7 brawlers. Each one is made of two things that are played
+together:
+
+- **4 drawn poses**, as a sprite strip
+- **a smooth motion** on top of them: the whole sprite bobs, rocks, squashes and stretches
+  while it walks, and pulls back and darts forward when it attacks
 
 ![All brawlers walking and attacking](../examples/animations.gif)
 
-In this preview every brawler is drawn at the same size, so the motion is easy to judge. Their
+The poses alone are about 8 pictures a second, which looks choppy however well they are drawn.
+The motion is what makes the animation smooth, so a game should use both. The preview above
+plays them together at 25 pictures a second; a game can go faster still.
+
+In the preview every brawler is drawn at the same size, so the motion is easy to judge. Their
 real sizes relative to each other are in [`brawlers/sizes.json`](../brawlers/sizes.json).
 
 ## Files
 
-Each brawler has a folder with four sprite strips. A strip is 4 frames side by side.
+Each brawler has a folder with four sprite strips. A strip is 4 poses side by side.
 
 | File | What it is |
 |---|---|
@@ -17,13 +26,13 @@ Each brawler has a folder with four sprite strips. A strip is 4 frames side by s
 | `attack.png` | Attack, plays once |
 | `walk_mirrored.png`, `attack_mirrored.png` | The same, facing the other way |
 
-The frames are shaded like the sprites in `brawlers/shaded/`, at half their pixel size (the
+The poses are shaded like the sprites in `brawlers/shaded/`, at half their pixel size (the
 same size as the flat sprites in `brawlers/`).
 
 Use the mirrored strips when a brawler faces the other way. Do not flip a strip in the game:
 its light would flip too, and the TNT's letters would read backwards.
 
-[`animations.json`](animations.json) has the numbers a game needs:
+[`animations.json`](animations.json) has everything else a game needs. For each brawler:
 
 | Brawler | Folder | Frame size (px) | Anchor (x, y) |
 |---|---|---|---|
@@ -35,30 +44,72 @@ its light would flip too, and the TNT's letters would read backwards.
 | Mr Nut | `acorn/` | 298 × 238 | 149, 232 |
 | Octopus | `octopus/` | 334 × 243 | 167, 237 |
 
+And for each animation of a brawler:
+
+| Field | Meaning |
+|---|---|
+| `duration_ms` | How long the animation takes: 520 ms for a walk cycle, 640 ms for an attack |
+| `frame_ms` | How long each of the 4 poses is shown |
+| `loop` | `true` for the walk, `false` for the attack |
+| `hit_ms` | Attack only: the moment the hit lands |
+| `returns_to_rest` | Attack only: `false` for the TNT, which ends on the pose before it bursts |
+| `motion` | Five lists of 49 numbers: `x`, `y`, `rotate`, `scale_x`, `scale_y` |
+
 ## How to play them
 
-- **Frames:** cut a strip into 4 frames of the frame width.
-- **Anchor:** draw every frame with its anchor point on the brawler's spot on the ground. The
-  anchor is the centre of the body on the ground line, and it is in the same place in every
+At every screen refresh, with `t` the time since the animation started (for the walk, start
+over whenever `t` reaches `duration_ms`):
+
+1. **Pick the pose.** Cut the strip into 4 frames of the frame width and show the one whose
+   turn it is, going by `frame_ms`.
+2. **Read the motion.** The 49 numbers of each list are spread evenly from the start of the
+   animation to its end. Find where `t` falls between two of them and blend the two.
+3. **Draw the pose** with its anchor point on the brawler's spot on the ground, after:
+   - stretching it by `scale_x` and `scale_y`, from the anchor point
+   - turning it by `rotate` degrees clockwise, around the anchor point
+   - moving it by `x` and `y` (in frame pixels; `y` is negative upwards)
+
+Details:
+
+- **Anchor:** the centre of the body on the ground line. It is in the same place in every
   frame of a brawler, so nothing jitters and walk and attack can be swapped freely.
-- **Size:** scale each brawler by its `scale` in `brawlers/sizes.json`.
-- **Walk:** loop the 4 frames, 130 ms each.
-- **Attack:** play once, with the frames shown for 130, 70, 150 and 130 ms: wind up, strike,
-  hold, recover. The hit lands on the third frame. The last frame is the resting pose, so it
-  also works as the standing pose.
-- **Effects:** no fire, magic or sparks are drawn into the frames. Add them in the game from
-  [`effects/pieces/`](../effects/pieces/), for example fire at the Dragon's mouth on the
-  third attack frame.
-- **Ghost:** it floats, so its frames already hover at different heights.
+- **Size:** scale each brawler by its `scale` in `brawlers/sizes.json`. Scale `x` and `y` by
+  the same amount.
+- **Mirrored strips:** flip the sign of `x` and `rotate`.
+- **Standing still:** the last attack pose is the resting pose. For the TNT, use the last walk
+  pose instead.
+- **Effects:** no fire, magic or sparks are drawn into the poses. Add them in the game from
+  [`effects/pieces/`](../effects/pieces/) at `hit_ms`, for example fire at the Dragon's mouth.
+- **TNT:** its attack is the build-up to the explosion. It swells and shakes harder and
+  harder, and should burst at `hit_ms`, which is the end of the animation.
+
+## The motion
+
+The motion is described in [`scripts/brawler_motion.py`](../scripts/brawler_motion.py), in two
+short tables that are easy to change:
+
+| Brawler | Walk | Attack |
+|---|---|---|
+| Peep, TNT, Dragon, Mage, Mr Nut | Waddle: lifts and stretches with every step, rocks from side to side | Lunge: pulls back, darts forward, lands, returns |
+| Ghost | Float: drifts up and down, swaying | Lunge |
+| Octopus | Crawl: flattens and rises as it pulls itself along | Lunge |
+| TNT | Waddle | Swell: squashes, springs up, then swells and shakes |
+
+The Mage and Mr Nut also hop a little while winding up, and the Dragon shakes while it holds
+its fire breath. The poses change at the moments the sprite moves fastest, where the eye does
+not catch the change.
+
+What the motion cannot do is redraw the legs and arms: they still change in 4 steps. Making
+those smoother too would take more drawn poses per animation.
 
 ## Known quirks
 
 These come from the source sheets. To fix one, generate a new sheet for that brawler, replace
 its file in `source/` and run the script again.
 
-- **Mr Nut:** the walk has very little movement, and on the third attack frame it is turned
-  away, so its face is hidden.
-- **Ghost:** on the second and third walk frames it turns sideways, so it changes shape more
+- **Mr Nut:** its legs barely move in the walk, so the walk comes almost entirely from the
+  motion. On the third attack pose it is turned away, so its face is hidden.
+- **Ghost:** on the second and third walk poses it turns sideways, so it changes shape more
   than the others.
 - **TNT and Mage:** their feet are dark red and dark blue here, but black on the still sprites.
 
