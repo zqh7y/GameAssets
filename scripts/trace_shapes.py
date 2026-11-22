@@ -1,61 +1,27 @@
-"""Trace the brawlers' particle effects out of their green-screen sheet.
+"""Trace flat shapes out of a green screen, crisp and in their exact colours.
 
-Source (in effects/source/):
-  - effects_greenscreen.jpg : 7 small clusters of flat shapes in a row, one per brawler
-
-Output:
-  - effects/<name>.png            each whole cluster, as it was drawn
-  - effects/pieces/<name>_<n>.png every single shape of a cluster, biggest first (n = 1, 2, ...)
-
-The sheet is small and every shape is one flat colour, so the shapes are traced rather than
-just cut out: each pixel is assigned to one of the cluster's few colours, the outline is
-enlarged 3x and re-sharpened, and the result is filled with the exact flat colour. That
-gives crisp sprites with no green fringe.
+Used by animation_effects.py for the attack and walking effects. Those sheets are small, and
+every shape on them is one flat colour, so the shapes are traced rather than just cut out: each
+pixel is assigned to one of a few flat colours, the outline is enlarged 3x and re-sharpened,
+and the result is filled with the exact flat colour. That gives crisp sprites with no green
+fringe.
 
 Requires: numpy, Pillow
-Run from the repo root:  python3 scripts/extract_effects.py
 """
-
-from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-from extract_brawlers import dilate, label
+from extract_brawlers import dilate
 from shade_brawlers import blur
 
-ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "effects" / "source" / "effects_greenscreen.jpg"
-OUT = ROOT / "effects"
-PIECES = OUT / "pieces"
-
-# Names of the clusters on the sheet, left to right, and the brawler each belongs to.
-SHEET_NAMES = ["feathers", "spark", "fire", "magic", "mist", "leaves", "bubbles"]
-BRAWLER = {"feathers": "chick", "spark": "tnt", "fire": "dragon", "magic": "wizard",
-           "mist": "ghost", "leaves": "acorn", "bubbles": "octopus"}
-
 SCALE = 3            # output is this many times larger than the sheet
-PAD = 4              # transparent pixels kept around each sprite (in output pixels)
 FG_DISTANCE = 45.0   # a pixel this far from the background colour is certainly a shape
-CLUSTER_GAP = 22     # empty columns that separate two clusters on the sheet
 MERGE = 38.0         # colours closer than this are the same flat colour
-MIN_PIECE = 14       # ignore traced specks smaller than this many output pixels
 
 
 def erode(mask: np.ndarray) -> np.ndarray:
     return ~dilate(~mask, 1)
-
-
-def find_clusters(fg: np.ndarray) -> list[tuple[int, int]]:
-    """Column ranges (x0, x1) of the clusters, found from the gaps between them."""
-    cols = np.nonzero(fg.any(axis=0))[0]
-    runs = [[cols[0], cols[0]]]
-    for x in cols[1:]:
-        if x - runs[-1][1] <= CLUSTER_GAP:
-            runs[-1][1] = x
-        else:
-            runs.append([x, x])
-    return [(int(a), int(b)) for a, b in runs]
 
 
 def flat_colours(pixels: np.ndarray, bg: np.ndarray, purest: bool = False) -> np.ndarray:
@@ -183,48 +149,3 @@ def trace(rgb: np.ndarray, fg: np.ndarray, bg: np.ndarray, purest: bool = False)
     colour = palette[area.argmax(axis=0)]
     out = np.dstack([colour, alpha_big * 255.0])
     return np.clip(out + 0.5, 0, 255).astype(np.uint8)
-
-
-def crop(rgba: np.ndarray, region: np.ndarray) -> Image.Image:
-    """Cut `region` out of `rgba`, cropped tight with a small transparent padding."""
-    ys, xs = np.nonzero(region & (rgba[..., 3] > 0))
-    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-    part = rgba[y0:y1, x0:x1].copy()
-    part[..., 3] = np.where(region[y0:y1, x0:x1], part[..., 3], 0)
-    canvas = np.zeros((part.shape[0] + 2 * PAD, part.shape[1] + 2 * PAD, 4), dtype=np.uint8)
-    canvas[PAD:-PAD, PAD:-PAD] = part
-    return Image.fromarray(canvas, "RGBA")
-
-
-def main() -> None:
-    rgb = np.asarray(Image.open(SRC).convert("RGB")).astype(np.float32)
-    bg = np.median(np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]]), axis=0)
-    fg = np.sqrt(((rgb - bg) ** 2).sum(axis=2)) > FG_DISTANCE
-
-    clusters = find_clusters(fg)
-    if len(clusters) != len(SHEET_NAMES):
-        raise SystemExit(f"expected {len(SHEET_NAMES)} clusters on the sheet, found {len(clusters)}")
-
-    OUT.mkdir(exist_ok=True)
-    PIECES.mkdir(exist_ok=True)
-    for old in PIECES.glob("*.png"):
-        old.unlink()
-
-    for name, (x0, x1) in zip(SHEET_NAMES, clusters):
-        m = 6                                                            # margin around the cluster
-        xs = slice(max(0, x0 - m), x1 + m + 1)
-        rgba = trace(rgb[:, xs], fg[:, xs], bg)
-        solid = rgba[..., 3] > 127
-
-        crop(rgba, dilate(solid, 3)).save(OUT / f"{name}.png", optimize=True)
-
-        labels, n = label(solid)
-        parts = [(int((labels == i).sum()), i) for i in range(1, n + 1)]
-        parts = sorted((p for p in parts if p[0] >= MIN_PIECE), reverse=True)
-        for k, (_, i) in enumerate(parts, start=1):
-            crop(rgba, dilate(labels == i, 3)).save(PIECES / f"{name}_{k}.png", optimize=True)
-        print(f"{name:9s} for {BRAWLER[name]:8s} {len(parts):2d} pieces")
-
-
-if __name__ == "__main__":
-    main()
