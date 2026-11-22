@@ -10,7 +10,8 @@
         150,
         282
       ],
-      "height": 318
+      "height": 318,
+      "max_width": 266
     },
     "name": {
       "left": 292,
@@ -103,11 +104,112 @@
   },
   "font": "fonts/LilitaOne-Regular.ttf",
   "brawlers": {
+    "wizard": {
+      "name": "Mage",
+      "skill": "Casts magic bolts from far away.",
+      "card": "wizard/card.png",
+      "object": "wizard/object.png",
+      "object_size": 232,
+      "particles": [
+        "wizard/particles/1.png",
+        "wizard/particles/2.png",
+        "wizard/particles/3.png",
+        "wizard/particles/4.png",
+        "wizard/particles/5.png",
+        "wizard/particles/6.png",
+        "wizard/particles/7.png",
+        "wizard/particles/8.png",
+        "wizard/particles/9.png"
+      ],
+      "particle_seed": 31
+    },
+    "ghost": {
+      "name": "Ghost",
+      "skill": "Swipes enemies with its icy claws.",
+      "card": "ghost/card.png",
+      "object": "ghost/object.png",
+      "object_size": 272,
+      "particles": [
+        "ghost/particles/1.png",
+        "ghost/particles/2.png",
+        "ghost/particles/3.png",
+        "ghost/particles/4.png",
+        "ghost/particles/5.png",
+        "ghost/particles/6.png"
+      ],
+      "particle_seed": 41
+    },
+    "dragon": {
+      "name": "Dragon",
+      "skill": "Breathes fire on every enemy in front of it.",
+      "card": "dragon/card.png",
+      "object": "dragon/object.png",
+      "object_size": 272,
+      "particles": [
+        "dragon/particles/1.png",
+        "dragon/particles/2.png",
+        "dragon/particles/3.png",
+        "dragon/particles/4.png",
+        "dragon/particles/5.png",
+        "dragon/particles/6.png",
+        "dragon/particles/7.png",
+        "dragon/particles/8.png",
+        "dragon/particles/9.png"
+      ],
+      "particle_seed": 23
+    },
+    "tnt": {
+      "name": "TNT",
+      "skill": "Runs in and blows up everything around it.",
+      "card": "tnt/card.png",
+      "object": "tnt/object.png",
+      "object_size": 272,
+      "particles": [
+        "tnt/particles/1.png",
+        "tnt/particles/2.png",
+        "tnt/particles/3.png",
+        "tnt/particles/4.png"
+      ],
+      "particle_seed": 11
+    },
+    "octopus": {
+      "name": "Octopus",
+      "skill": "Slaps enemies with its tentacle.",
+      "card": "octopus/card.png",
+      "object": "octopus/object.png",
+      "object_size": 216,
+      "particles": [
+        "octopus/particles/1.png",
+        "octopus/particles/2.png",
+        "octopus/particles/3.png",
+        "octopus/particles/4.png",
+        "octopus/particles/5.png",
+        "octopus/particles/6.png"
+      ],
+      "particle_seed": 61
+    },
+    "acorn": {
+      "name": "Mr Nut",
+      "skill": "Swings its leaf and knocks enemies back.",
+      "card": "acorn/card.png",
+      "object": "acorn/object.png",
+      "object_size": 246,
+      "particles": [
+        "acorn/particles/1.png",
+        "acorn/particles/2.png",
+        "acorn/particles/3.png",
+        "acorn/particles/4.png",
+        "acorn/particles/5.png",
+        "acorn/particles/6.png"
+      ],
+      "particle_seed": 53
+    },
     "chick": {
       "name": "Peep",
       "skill": "Pecks the closest enemy, super fast.",
       "card": "chick/card.png",
       "object": "chick/object.png",
+      "object_size": 272,
       "particles": [
         "chick/particles/1.png",
         "chick/particles/2.png",
@@ -115,7 +217,8 @@
         "chick/particles/4.png",
         "chick/particles/5.png",
         "chick/particles/6.png"
-      ]
+      ],
+      "particle_seed": 7
     }
   }
 }

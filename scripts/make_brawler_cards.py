@@ -6,20 +6,25 @@ it (Peep's feather...), and about 100 small ones that drift across it, as if a b
 blowing through. The brawler stands on the left and pops out over the top of the card; its
 name and skill are written next to it.
 
-Source: cards/brawlers/source/<brawler>.jpg, a sheet on a green screen with the empty card at
-        the top, one big 3D object below it on the left, and 6 small ones on the right.
+Source: cards/brawlers/source/*.jpg, sheets on a green screen. A sheet has one brawler (the
+        empty card at the top, one big 3D object below it, small ones next to that) or several
+        brawlers in rows (the card on the left, the big object in the middle, small ones on the
+        right). The file name lists the brawlers on it, top to bottom: tnt-dragon-wizard.jpg.
 
 Output, per brawler, in cards/brawlers/<brawler>/:
   card.png           the card, 960 x 300 px: shorter than on the sheet, with crisp corners
   object.png         the big 3D object
-  particles/<n>.png  the small ones, n = 1 to 6, biggest first
-plus cards/brawlers/cards.json (where everything goes and how it moves, for the game) and a
-moving preview in examples/card_<brawler>.gif.
+  particles/<n>.png  the small ones, biggest first (4 to 9 of them, as drawn)
+plus cards/brawlers/cards.json (where everything goes and how it moves, for the game), a still
+of every card in examples/card_<brawler>.png, and a moving preview of three cards stacked like
+on the real screen in examples/cards_screen.gif.
 
 Requires: numpy, Pillow
 Run from the repo root:  python3 scripts/make_brawler_cards.py
+To also save every card as its own moving preview:  python3 scripts/make_brawler_cards.py --gifs <folder>
 """
 
+import argparse
 import json
 import math
 import random
@@ -41,7 +46,25 @@ NAMES = {k: v["name"] for k, v in json.loads((ROOT / "brawlers" / "sizes.json").
 # Skill text. Placeholders until the real skills are written.
 SKILLS = {
     "chick": "Pecks the closest enemy, super fast.",
+    "tnt": "Runs in and blows up everything around it.",
+    "dragon": "Breathes fire on every enemy in front of it.",
+    "wizard": "Casts magic bolts from far away.",
+    "ghost": "Swipes enemies with its icy claws.",
+    "acorn": "Swings its leaf and knocks enemies back.",
+    "octopus": "Slaps enemies with its tentacle.",
 }
+
+# The particles are placed at random, but the same way every time for a brawler, so a card
+# always looks the same. Each brawler has its own pattern, so stacked cards do not match.
+SEEDS = {"chick": 7, "tnt": 11, "dragon": 23, "wizard": 31, "ghost": 41, "acorn": 53, "octopus": 61}
+
+# The big object's longest side, in card pixels, where the default (LAYOUT["object"]["height"])
+# is too big: round and wide objects look bigger than a tall, thin feather at the same size.
+OBJECT_SIZE = {"wizard": 232, "acorn": 246, "octopus": 216}
+
+# The three cards stacked in the screen preview, top to bottom.
+SCREEN = ["chick", "tnt", "wizard"]
+SCREEN_SCALE = 0.5         # the screen preview is drawn at half size, to keep the file small
 
 # ---------------------------------------------------------------- layout and motion
 # Everything below is in pixels of the card (960 x 300), measured from its top left corner.
@@ -50,7 +73,8 @@ SKILLS = {
 LAYOUT = {
     "card": {"width": 960, "height": 300, "corner_radius": 42},
     # The brawler stands on the left, its feet near the bottom, popping out over the top.
-    "brawler": {"feet": [150, 282], "height": 318},
+    # It is `height` tall, unless that would make it wider than `max_width` (the Octopus).
+    "brawler": {"feet": [150, 282], "height": 318, "max_width": 266},
     # Name and skill: left aligned, in the middle of the card.
     "name": {"left": 292, "top": 56, "size": 92},
     "skill": {"left": 295, "top": 168, "size": 33, "line_height": 40, "width": 360},
@@ -90,25 +114,55 @@ BACKGROUND = (30, 24, 50)  # the screen behind the cards in the preview
 
 # ---------------------------------------------------------------- cutting the sheet
 
-def cut_sheet(path: Path) -> tuple[np.ndarray, Image.Image, list[Image.Image]]:
-    """The card (RGBA array, cropped), the big object, and the small objects, biggest first."""
+def bands(solid: np.ndarray, count: int) -> list[slice]:
+    """Split a sheet into `count` rows, at its widest empty gaps."""
+    if count == 1:
+        return [slice(0, solid.shape[0])]
+    rows = np.nonzero(solid.any(axis=1))[0]
+    gaps, start = [], None
+    for y in range(rows[0], rows[-1] + 1):
+        empty = not solid[y].any()
+        if empty and start is None:
+            start = y
+        elif not empty and start is not None:
+            gaps.append((y - start, (start + y) // 2))
+            start = None
+    if len(gaps) < count - 1:
+        raise SystemExit(f"expected {count} rows on the sheet, found {len(gaps) + 1}")
+    cuts = sorted(middle for _, middle in sorted(gaps, reverse=True)[:count - 1])
+    edges = [0] + cuts + [solid.shape[0]]
+    return [slice(a, b) for a, b in zip(edges, edges[1:])]
+
+
+def cut_sheet(path: Path, count: int) -> list[tuple[np.ndarray, Image.Image, list[Image.Image]]]:
+    """For every brawler on a sheet, top to bottom: its card (RGBA array, cropped), its big
+    object, and its small objects, biggest first.
+
+    In each brawler's part of the sheet, the widest piece is the card, the biggest of the
+    others is the big object, and the rest are the small ones.
+    """
     rgba = key_green(path)
     solid = rgba[..., 3] >= 128
     labels, n = label(dilate(solid, 2))
-    parts = []
-    for i in range(1, n + 1):
-        region = labels == i
-        ys, xs = np.nonzero(region & solid)
-        if len(xs) > 300:
-            parts.append((ys.min(), len(xs), region))
-    if len(parts) != 8:
-        raise SystemExit(f"{path.name}: expected 8 pieces (card, big object, 6 small ones), found {len(parts)}")
-    parts.sort(key=lambda p: p[0])                       # the card is the top piece
-    card = np.asarray(crop_to_alpha(rgba, dilate(parts[0][2], 2)))
-    rest = sorted(parts[1:], key=lambda p: -p[1])         # then the biggest piece is the big object
-    big = crop_to_alpha(rgba, dilate(rest[0][2], 2))
-    small = [crop_to_alpha(rgba, dilate(p[2], 2)) for p in rest[1:]]
-    return card, big, small
+    out = []
+    for number, band in enumerate(bands(solid, count), start=1):
+        inside = np.zeros_like(solid)
+        inside[band] = True
+        parts = []
+        for i in range(1, n + 1):
+            region = (labels == i) & inside
+            ys, xs = np.nonzero(region & solid)
+            if len(xs) > 300:
+                parts.append((xs.max() - xs.min(), len(xs), region))
+        if len(parts) < 3:
+            raise SystemExit(f"{path.name}, row {number}: expected a card, a big object and small ones, found {len(parts)} pieces")
+        parts.sort(key=lambda p: -p[0])
+        card = np.asarray(crop_to_alpha(rgba, dilate(parts[0][2], 2)))
+        rest = sorted(parts[1:], key=lambda p: -p[1])
+        big = crop_to_alpha(rgba, dilate(rest[0][2], 2))
+        small = [crop_to_alpha(rgba, dilate(p[2], 2)) for p in rest[1:]]
+        out.append((card, big, small))
+    return out
 
 
 def rounded_mask(width: int, height: int, radius: float, scale: int = 4) -> np.ndarray:
@@ -229,6 +283,8 @@ def stamp(canvas: Image.Image, img: Image.Image, cx: float, cy: float) -> None:
     """Draw `img` centred on (cx, cy); it may be partly outside the canvas."""
     x, y = round(cx - img.width / 2), round(cy - img.height / 2)
     left, top = max(0, -x), max(0, -y)
+    if left >= img.width or top >= img.height:
+        return                                            # entirely off the canvas
     if left or top:
         img = img.crop((left, top, img.width, img.height))
     if img.width > 0 and img.height > 0:
@@ -286,11 +342,16 @@ def text_layer(size: tuple, brawler: str, card_colour: tuple) -> Image.Image:
             lines[-1] = trial
         else:
             lines.append(word)
-    light_card = sum(card_colour) / 3 > 150
-    ink = (110, 58, 18, 255) if light_card else (255, 255, 255, 255)
+    r, g, b = card_colour
+    light_card = 0.299 * r + 0.587 * g + 0.114 * b > 150      # how bright the card looks
     d = ImageDraw.Draw(layer)
     for i, line in enumerate(lines[:2]):
-        d.text((ox + spec["left"] * SS, oy + (spec["top"] + i * spec["line_height"]) * SS), line, font=font, fill=ink)
+        at = (ox + spec["left"] * SS, oy + (spec["top"] + i * spec["line_height"]) * SS)
+        if light_card:
+            d.text(at, line, font=font, fill=(110, 58, 18, 255))
+        else:
+            edge = tuple(int(v * 0.35) for v in card_colour) + (255,)   # a deep tone of the card
+            d.text(at, line, font=font, fill=(255, 255, 255, 255), stroke_width=3 * SS, stroke_fill=edge)
     return layer
 
 
@@ -306,7 +367,10 @@ def shine_band(size: tuple, x: float) -> Image.Image:
     return Image.fromarray(out, "RGBA")
 
 
-def build_preview(brawler: str, card: Image.Image, big: Image.Image, small: list[Image.Image]) -> None:
+def build_preview(brawler: str, card: Image.Image, big: Image.Image, small: list[Image.Image],
+                  gif_folder: Path | None = None) -> list[Image.Image]:
+    """Render the card's loop. Saves a still to examples/, and the moving preview to `gif_folder`
+    if one is given. Returns the frames."""
     w, h = LAYOUT["card"]["width"], LAYOUT["card"]["height"]
     size = ((MARGIN[0] + w + MARGIN[2]) * SS, (MARGIN[1] + h + MARGIN[3]) * SS)
     ox, oy = MARGIN[0] * SS, MARGIN[1] * SS
@@ -337,13 +401,18 @@ def build_preview(brawler: str, card: Image.Image, big: Image.Image, small: list
     # Particle sprites, per layer: far ones paler (closer to the card colour).
     layers = MOTION["particles"]["layers"]
     sprites = [[tinted(s, card_colour, layer["fade_to_card"]) for s in small] for layer in layers]
-    particles = make_particles(random.Random(7), len(small))
+    particles = make_particles(random.Random(SEEDS.get(brawler, 7)), len(small))
 
     spec_b, move_b = LAYOUT["brawler"], MOTION["brawler"]
     body = Image.open(ROOT / "brawlers" / "shaded" / f"{brawler}.png").convert("RGBA")
     body = body.crop(body.getbbox())
     feet = (ox + spec_b["feet"][0] * SS, oy + spec_b["feet"][1] * SS)
+    tall = spec_b["height"]                                          # its size on the card
+    if body.width * tall / body.height > spec_b["max_width"]:
+        tall = body.height * spec_b["max_width"] / body.width
+    wide = body.width * tall / body.height
     spec_o, move_o = LAYOUT["object"], MOTION["object"]
+    object_size = OBJECT_SIZE.get(brawler, spec_o["height"])
 
     frames = []
     for ms in np.arange(0, loop, 1000 / FPS):
@@ -376,18 +445,18 @@ def build_preview(brawler: str, card: Image.Image, big: Image.Image, small: list
         cx, cy = ox + spec_o["center"][0] * SS, oy + (spec_o["center"][1] + bob) * SS
         lift = (bob + move_o["bob_px"]) / (2 * move_o["bob_px"])            # 0 at its lowest, 1 at its highest
         sw, sh = 150 * SS * (1.05 - 0.15 * (1 - lift)), 34 * SS
-        sy = oy + (spec_o["center"][1] + spec_o["height"] * 0.40) * SS
+        sy = oy + (spec_o["center"][1] + object_size * 0.40) * SS
         frame.alpha_composite(clipped(soft_ellipse(size, (cx - 40 * SS - sw / 2, sy - sh / 2, cx - 40 * SS + sw / 2, sy + sh / 2),
                                                    shade + (int(70 + 40 * (1 - lift)),), 12 * SS)))
-        stamp(frame, turned(big, spec_o["height"] * SS, 1.0, rock), cx, cy)
+        stamp(frame, turned(big, object_size * SS, 1.0, rock), cx, cy)
 
         # The brawler: breathing and rocking on its feet, with its shadow on the card.
         breathe = 1 + move_b["breathe"] * math.sin(2 * math.pi * ms / move_b["breathe_ms"])
         rock = move_b["rock_deg"] * math.sin(2 * math.pi * ms / move_b["rock_ms"])
-        sw = spec_b["height"] * 0.62 * SS / math.sqrt(breathe)
+        sw = max(tall, wide) * 0.62 * SS / math.sqrt(breathe)
         frame.alpha_composite(clipped(soft_ellipse(size, (feet[0] - sw / 2, feet[1] - 12 * SS, feet[0] + sw / 2, feet[1] + 14 * SS),
                                                    shade + (120,), 6 * SS)))
-        k = spec_b["height"] * SS / body.height
+        k = tall * SS / body.height
         stood = premultiplied(body).resize((round(body.width * k / math.sqrt(breathe)), round(body.height * k * breathe)), Image.LANCZOS)
         pad = Image.new("RGBa", (stood.width * 2, stood.height * 2), (0, 0, 0, 0))
         pad.paste(stood, (stood.width // 2, 0))                              # feet in the middle of the pad
@@ -397,45 +466,119 @@ def build_preview(brawler: str, card: Image.Image, big: Image.Image, small: list
         frame.alpha_composite(words)
         frames.append(frame.resize((size[0] // SS, size[1] // SS), Image.LANCZOS).convert("RGB"))
 
-    # One shared palette for every frame, so colours do not flicker from frame to frame.
+    frames[0].save(EXAMPLES / f"card_{brawler}.png", optimize=True)
+    if gif_folder is not None:
+        save_gif(frames, gif_folder / f"card_{brawler}.gif")
+    return frames
+
+
+def distinct_colours(sprite: Image.Image, bins: int = 24, share: float = 0.003) -> list[tuple]:
+    """One light and one dark tone of every hue that covers a noticeable part of a sprite."""
+    a = np.asarray(sprite.convert("RGBA"))
+    px = a[a[..., 3] > 200][:, :3]
+    hsv = np.asarray(Image.fromarray(px.reshape(-1, 1, 3).astype(np.uint8)).convert("HSV")).reshape(-1, 3).astype(int)
+    keep = (hsv[:, 1] > 60) & (hsv[:, 2] > 50)                      # colourful, not dark
+    px, hsv = px[keep], hsv[keep]
+    out = []
+    for k in range(bins):
+        in_bin = (hsv[:, 0] * bins // 256) == k
+        if in_bin.sum() < share * len(px):
+            continue
+        value = hsv[in_bin, 2]
+        for part in (value >= np.median(value), value < np.median(value)):
+            if part.any():
+                out.append(tuple(int(c) for c in np.median(px[in_bin][part], axis=0)))
+    return out
+
+
+def save_gif(frames: list[Image.Image], path: Path, keep: list[tuple] = ()) -> None:
+    """A looping GIF. One shared palette for every frame, so colours do not flicker.
+
+    A GIF has only 255 colours, chosen from the frames by area. A small spot of its own colour
+    can lose out (Peep's orange beak next to TNT's big red card turned red), so the colours in
+    `keep` get a place in the palette first.
+    """
     sample = Image.new("RGB", (frames[0].width, frames[0].height * 4))
     for i, f in enumerate(frames[:: max(1, len(frames) // 4)][:4]):
         sample.paste(f, (0, i * f.height))
-    palette = sample.quantize(colors=255, method=Image.MEDIANCUT)
+    keep = list(dict.fromkeys(keep))[:128]
+    if keep:
+        rest = 255 - len(keep)
+        chosen = sample.quantize(colors=rest, method=Image.Quantize.MEDIANCUT).getpalette()[: 3 * rest]
+        palette = Image.new("P", (1, 1))
+        palette.putpalette([c for colour in keep for c in colour] + chosen + [0, 0, 0] * (256 - 255))
+    else:
+        palette = sample.quantize(colors=255, method=Image.Quantize.MEDIANCUT)
     images = [f.quantize(palette=palette, dither=Image.Dither.NONE) for f in frames]
-    EXAMPLES.mkdir(exist_ok=True)
-    images[0].save(EXAMPLES / f"card_{brawler}.gif", save_all=True, append_images=images[1:],
+    path.parent.mkdir(parents=True, exist_ok=True)
+    images[0].save(path, save_all=True, append_images=images[1:],
                    duration=round(1000 / FPS), loop=0, disposal=1, optimize=False)
-    frames[0].save(EXAMPLES / f"card_{brawler}.png", optimize=True)
+
+
+def build_screen(frames: dict[str, list[Image.Image]]) -> None:
+    """Three cards stacked like on the real screen. Each runs a second behind the one above,
+    so their shines sweep down the screen one after another."""
+    names = [b for b in SCREEN if b in frames]
+    if not names:
+        return
+    first = frames[names[0]][0]
+    w, h = round(first.width * SCREEN_SCALE), round(first.height * SCREEN_SCALE)
+    count, offset = len(frames[names[0]]), round(FPS)              # one second between the cards
+    small = {b: [f.resize((w, h), Image.LANCZOS) for f in frames[b]] for b in names}
+    screen = []
+    for i in range(count):
+        page = Image.new("RGB", (w, h * len(names)), BACKGROUND)
+        for row, b in enumerate(names):
+            page.paste(small[b][(i + row * offset) % count], (0, row * h))
+        screen.append(page)
+    keep = []
+    for b in names:
+        body = Image.open(ROOT / "brawlers" / "shaded" / f"{b}.png")
+        keep += distinct_colours(body.crop(body.getbbox()))
+    save_gif(screen, EXAMPLES / "cards_screen.gif", keep)
 
 
 # ---------------------------------------------------------------- main
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--gifs", type=Path, help="also save every card as its own moving preview in this folder")
+    args = parser.parse_args()
+
     sheets = sorted(SRC.glob("*.jpg"))
     if not sheets:
         raise SystemExit("no sheets in cards/brawlers/source/")
     meta = {"layout": LAYOUT, "motion": MOTION, "font": "fonts/LilitaOne-Regular.ttf", "brawlers": {}}
+    screen = {}
     for sheet in sheets:
-        brawler = sheet.stem
-        card_part, big, small = cut_sheet(sheet)
-        card = make_card(card_part)
-        folder = OUT / brawler
-        (folder / "particles").mkdir(parents=True, exist_ok=True)
-        card.save(folder / "card.png", optimize=True)
-        big.save(folder / "object.png", optimize=True)
-        for i, s in enumerate(small, start=1):
-            s.save(folder / "particles" / f"{i}.png", optimize=True)
-        meta["brawlers"][brawler] = {
-            "name": NAMES[brawler],
-            "skill": SKILLS.get(brawler, ""),
-            "card": f"{brawler}/card.png",
-            "object": f"{brawler}/object.png",
-            "particles": [f"{brawler}/particles/{i}.png" for i in range(1, len(small) + 1)],
-        }
-        build_preview(brawler, card, big, small)
-        print(f"{brawler:8s} card {card.size}, object {big.size}, {len(small)} particles")
+        names = sheet.stem.split("-")
+        for brawler, (card_part, big, small) in zip(names, cut_sheet(sheet, len(names))):
+            card = make_card(card_part)
+            folder = OUT / brawler
+            (folder / "particles").mkdir(parents=True, exist_ok=True)
+            for old in (folder / "particles").glob("*.png"):
+                old.unlink()
+            card.save(folder / "card.png", optimize=True)
+            big.save(folder / "object.png", optimize=True)
+            for i, piece in enumerate(small, start=1):
+                piece.save(folder / "particles" / f"{i}.png", optimize=True)
+            meta["brawlers"][brawler] = {
+                "name": NAMES[brawler],
+                "skill": SKILLS.get(brawler, ""),
+                "card": f"{brawler}/card.png",
+                "object": f"{brawler}/object.png",
+                "object_size": OBJECT_SIZE.get(brawler, LAYOUT["object"]["height"]),
+                "particles": [f"{brawler}/particles/{i}.png" for i in range(1, len(small) + 1)],
+                "particle_seed": SEEDS.get(brawler, 7),
+            }
+            frames = build_preview(brawler, card, big, small, args.gifs)
+            if brawler in SCREEN:
+                screen[brawler] = frames
+            print(f"{brawler:8s} card {card.size}, object {big.size}, {len(small)} particles")
+    order = [b for b in NAMES if b in meta["brawlers"]]
+    meta["brawlers"] = {b: meta["brawlers"][b] for b in order}
     (OUT / "cards.json").write_text(json.dumps(meta, indent=2) + "\n")
+    build_screen(screen)
 
 
 if __name__ == "__main__":

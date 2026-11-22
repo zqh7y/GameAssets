@@ -6,11 +6,22 @@ intended look, so the game can be built to match.
 ## Brawler cards
 
 The new card design: wide and short, one per brawler, from
-[`cards/brawlers/`](../cards/brawlers/). Peep's is done so far.
+[`cards/brawlers/`](../cards/brawlers/). Three of them stacked like on the screen:
 
-![Peep's card](card_chick.gif)
+![Peep, TNT and Mage cards stacked](cards_screen.gif)
 
-The skill text is a placeholder.
+All seven, as stills:
+
+![Peep's card](card_chick.png)
+![TNT's card](card_tnt.png)
+![Dragon's card](card_dragon.png)
+![Mage's card](card_wizard.png)
+![Ghost's card](card_ghost.png)
+![Mr Nut's card](card_acorn.png)
+![Octopus's card](card_octopus.png)
+
+The skill texts are placeholders. Every card's own moving preview is about 8 MB, so they are
+not kept here; `cards/brawlers/README.md` says how to make them.
 
 ## Earlier cards
 
